@@ -968,6 +968,26 @@ bool MainWindow::WriteTVsToCSV(QStandardItemModel* model, QStringList& explainLi
     return true;
 }
 
+QString fileErrorString(QFile::FileError error) {
+	switch(error) {
+	case QFile::NoError:			return "No error occurred.";
+	case QFile::ReadError:			return "An error occurred when reading from the file.";
+	case QFile::WriteError:			return "An error occurred when writing to the file.";
+	case QFile::FatalError:			return "A fatal error occurred.";
+	case QFile::ResourceError:		return "A resource error occured.";
+	case QFile::OpenError:			return "The file could not be opened.";
+	case QFile::AbortError:			return "The operation was aborted.";
+	case QFile::TimeOutError:		return "A timeout occurred.";
+	case QFile::RemoveError:		return "The file could not be removed.";
+	case QFile::RenameError:		return "The file could not be renamed.";
+	case QFile::PositionError:		return "The position in the file could not be changed.";
+	case QFile::ResizeError:		return "The file could not be resized.";
+	case QFile::PermissionsError:	return "The file could not be accessed.";
+	case QFile::CopyError:			return "The file could not be copied.";
+	default:
+	case QFile::UnspecifiedError:	return "An unspecified error occurred.";
+	}
+}
 
 // アーキテクチャの仕様書を生成
 // TODO
@@ -977,7 +997,9 @@ bool MainWindow::WriteCSV(QString filepath)
     QFile file(filepath);
     if (file.open(QIODevice::WriteOnly | QIODevice::Text) == false)
     {
-        QMessageBox::critical(NULL, "書き込みエラー", "設定ファイルの書き込みに失敗しました", QMessageBox::Ok);
+        QString error = QString("設定ファイルの書き込みに失敗しました: %1 %2")
+            .arg(filepath).arg(fileErrorString(file.error()));
+        QMessageBox::critical(NULL, "書き込みエラー", error, QMessageBox::Ok);
         return false;
     }
     QTextStream out(&file);
