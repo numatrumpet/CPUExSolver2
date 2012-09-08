@@ -43,8 +43,8 @@ $(DSTDIR_TOP)/Makefile.in_f: $(DSTDIR_TOP) Makefile.in.tmpl
 $(DSTDIR_TOP)/README.txt_f: $(DSTDIR_TOP) README.txt.tmpl
 	cp README.txt.tmpl $(DSTDIR_TOP)/README.txt
 
-$(DSTDIR_TOP)/specifications.csv_f: $(DSTDIR_TOP) specifications.csv.tmpl
-	cp specifications.csv.tmpl $(DSTDIR_TOP)/specifications.csv
+$(DSTDIR_TOP)/specifications.csv_f: $(DSTDIR_TOP) ${notdir $(CONFIGFILE)}
+	python specification.py ${notdir $(CONFIGFILE)} > $(DSTDIR_TOP)/specifications.tsv
 
 $(DSTDIR_TOP)/test_f: $(DSTDIR_TOP) test
 	cp -r test $(DSTDIR_TOP)/test
