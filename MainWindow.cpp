@@ -941,106 +941,6 @@ QString MainWindow::ReformBinaryValue(QString binVal, int length)
     return binVal;
 }
 
-bool MainWindow::WriteTVsToCSV(QStandardItemModel* model, QStringList& explainList, QTextStream& out)
-{
-    const QString delimiter = "\t";
-    for (int row = 0; row < model->rowCount(); row++)
-    {
-        if (model->item(row, 0)->text().trimmed().isEmpty()) continue;
-        bool use =  model->item(row, 4)->text() == "必須" || model->item(row, 4)->checkState() == Qt::Checked;
-        if (use == false) continue;
-        QString name = model->item(row, 1)->text();
-        QString explain = explainList[row].replace("\n", "");
-        QString binForm = model->item(row, 6)->text();
-        QString asmForm = model->item(row, 0)->text();
-        QString code = model->item(row, 5)->text().replace("\n", "; ");
-        QString op = model->item(row, 2)->text();
-        if (IsConstBinaryName(op)) op = GetConstBinaryValue(op);
-        QString funct = binForm == "R" ? model->item(row, 3)->text() : "";
-        out << name << delimiter
-            << explain << delimiter
-            << binForm << delimiter
-            << asmForm << delimiter
-            << code << delimiter
-            << ReformBinaryValue(op, BINARY_LENGTH) << delimiter
-            << ReformBinaryValue(funct,BINARY_LENGTH) << "\n";
-    }
-    return true;
-}
-
-QString fileErrorString(QFile::FileError error) {
-	switch(error) {
-	case QFile::NoError:			return "No error occurred.";
-	case QFile::ReadError:			return "An error occurred when reading from the file.";
-	case QFile::WriteError:			return "An error occurred when writing to the file.";
-	case QFile::FatalError:			return "A fatal error occurred.";
-	case QFile::ResourceError:		return "A resource error occured.";
-	case QFile::OpenError:			return "The file could not be opened.";
-	case QFile::AbortError:			return "The operation was aborted.";
-	case QFile::TimeOutError:		return "A timeout occurred.";
-	case QFile::RemoveError:		return "The file could not be removed.";
-	case QFile::RenameError:		return "The file could not be renamed.";
-	case QFile::PositionError:		return "The position in the file could not be changed.";
-	case QFile::ResizeError:		return "The file could not be resized.";
-	case QFile::PermissionsError:	return "The file could not be accessed.";
-	case QFile::CopyError:			return "The file could not be copied.";
-	default:
-	case QFile::UnspecifiedError:	return "An unspecified error occurred.";
-	}
-}
-
-// アーキテクチャの仕様書を生成
-// TODO
-bool MainWindow::WriteCSV(QString filepath)
-{
-    const QString delimiter = "\t";
-    QFile file(filepath);
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text) == false)
-    {
-        QString error = QString("設定ファイルの書き込みに失敗しました: %1 %2")
-            .arg(filepath).arg(fileErrorString(file.error()));
-        QMessageBox::critical(NULL, "書き込みエラー", error, QMessageBox::Ok);
-        return false;
-    }
-    QTextStream out(&file);
-    out.setCodec("UTF-8");
-
-    for (int row = 0; row < generalOptions.length(); row++)
-    {
-        out << generalOptions[row] << delimiter << generalModel->item(row)->text() << "\n";
-    }
-
-    out << "\n";
-    out << "\n";
-
-    out << QString("命令形式") << "\n";
-    out << QString("R") << delimiter << "op(6bit)" << delimiter << "rs(5bit)" << delimiter << "rt(5bit)" << delimiter << "rd(5bit)" << delimiter << "shamt(5bit)"  << delimiter << "funct(5bit)" << "\n";
-    out << QString("I") << delimiter << "op(6bit)" << delimiter << "rs(5bit)" << delimiter << "rt(5bit)" << delimiter << "imm(16bit)" << "\n";
-    out << QString("J") << delimiter << "op(6bit)" << delimiter << "target(26bit)" << "\n";
-
-    out << "\n";
-    out << "\n";
-
-    out << QString("命令名") << delimiter
-        << QString("説明") << delimiter
-        << QString("命令形式") << delimiter
-        << QString("アセンブリ形式") << delimiter
-        << QString("擬似コード") << delimiter
-        << QString("op") << delimiter << delimiter << delimiter << delimiter << delimiter << delimiter
-        << QString("funct") << "\n";
-
-    WriteTVsToCSV(int1Model, int1Expalains, out);
-    WriteTVsToCSV(int2Model, int2Expalains, out);
-    WriteTVsToCSV(floatModel, floatExpalains, out);
-    WriteTVsToCSV(ifconvModel, ifconvExpalains, out);
-    WriteTVsToCSV(memoryModel, memoryExpalains, out);
-    WriteTVsToCSV(branchModel, branchExpalains, out);
-    WriteTVsToCSV(ioModel, ioExpalains, out);
-
-    file.close();
-    return true;
-}
-
 bool MainWindow::ErrorMsg(QString msg)
 {
     QMessageBox::critical(NULL, "設定エラー", msg, QMessageBox::Ok);
@@ -1219,8 +1119,6 @@ void MainWindow::CreateArchitecture()
     if (filepath == "" || !QDir(filepath).exists()) return;
     QString configFile = generalModel->item(ARCHITECTURE)->text() + ".xml";
     if (WriteXML("templates/" + configFile) == false) return;
-    QString specFile = "specifications.csv.tmpl";
-    if (WriteCSV("templates/" + specFile) == false) return;
     genDlg.Run("../" + configFile, filepath + "/" + generalModel->item(ARCHITECTURE)->text());
     genDlg.show();
 }
