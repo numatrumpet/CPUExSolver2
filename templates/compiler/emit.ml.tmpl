@@ -33,12 +33,16 @@
 	def isUse(type):
 		use = getInst(type).get("use", "true")
 		return use != "false"
-		
+
+  def assertAvailable(type):
+		assert isUse(type), "[emit] %s must be supported." % (getName(type))
+
 	def call(label):
 		if  isUse("CALL") and isUse("CALLREG") and isUse("RETURN"):
 			return "%s %s" % (getName("CALL"), label)
 		else:
-			assert isUse("JMP_LNK") and isUse("JMPREG_LNK"), "[call()]%s and %s must be supported." % (getName("JMP_LNK"), getName("JMPREG_LNK"))
+	    assertAvailable("JMP_LNK")
+			assertAvailable("JMPREG_LNK")
 			ans = "%s %s, %s, 0\n" % (getName("STI"), LR, FR)
 			ans += "\t" + (addi(FR, FR, -addressingUnit)) + "\n"
 			ans += "\t%s %s\n" % (getName("JMP_LNK"), label)
@@ -50,7 +54,8 @@
 		if  isUse("CALL") and isUse("CALLREG") and isUse("RETURN"):
 			return "%s %s" % (getName("CALLREG"), rs)
 		else:
-			assert isUse("JMP_LNK") and isUse("JMPREG_LNK"), "[call()]%s and %s must be supported." % (getName("JMP_LNK"), getName("JMPREG_LNK"))
+	    assertAvailable("JMP_LNK")
+			assertAvailable("JMPREG_LNK")
 			ans = "%s %s, %s, 0\n" % (getName("STI"), LR, FR)
 			ans += "\t" + (addi(FR, FR, -addressingUnit)) + "\n"
 			ans += "\t%s %s\n" % (getName("JMPREG_LNK"), rs)
@@ -171,7 +176,7 @@ and g' oc = function
 				(s lsl 31) + (exp lsl 23) + frac
 			) in
 		Output.add_stmt (Output.Comment (Printf.sprintf "\t${comment} %f" f));
-## SETHI, SETLO, STI, LDIは絶対ある
+% assertAvailable("SETHI"); assertAvailable("SETLO"); assertAvailable("STI"); assertAvailable("LDI")
 % if isUse("FSETHI") and isUse("FSETLO"):
 		Output.add_stmt (Output.FMvhi (x, (b lsr 16) mod (1 lsl 16)));
 		Output.add_stmt (Output.FMvlo (x, (b mod (1 lsl 16))));
@@ -221,14 +226,15 @@ and g' oc = function
 	| NonTail(x), Mov(y) when x = y -> ()
 
 	## MOVは少なくともニーモニックとして必ず用意される
+  % assertAvailable("MOV")
 	| NonTail(x), Mov(y) ->
 		Output.add_stmt (Output.Mov (x, y))
 
-	## SUBは必須
+  % assertAvailable("SUB")
 	| NonTail(x), Neg(y) -> 
 		Output.add_stmt (Output.Sub (x, reg_0, y))
 
-	## ADDは必須
+  % assertAvailable("ADD")
 	| NonTail(x), Add(y, V(z)) ->
 		Output.add_stmt (Output.Add (x, y, z))
 
@@ -243,6 +249,7 @@ and g' oc = function
 % endif
 
 	## SUBは必須
+  % assertAvailable("SUB")
 	| NonTail(x), Sub(y, V(z)) ->	
 		Output.add_stmt (Output.Sub (x, y, z))
 
@@ -258,7 +265,7 @@ and g' oc = function
 
 	## mul, muli, div, diviの使用不使用はparser.mlyで調整
 	| NonTail(x), Mul(y, V(z)) ->
-% if isUse("MUL"):
+% assertAvailable("SUB")
 		Output.add_stmt (Output.Mul (x, y, z))
 % else:
 		failwith "This architecture does not support ${getName("MUL")}."
@@ -347,6 +354,7 @@ and g' oc = function
 
 	## fmov, fneg, fadd, fmulは必須。fsubはなくても良い
 	## fdiv, finvはどちらか少なくとも一方は必要
+% assertAvailable("fmov"); assertAvailable("fneg"); assertAvailable("fadd"); assertAvailable("fmul")
 	| NonTail(x), FMov(y) when x = y -> ()
 
 	| NonTail(x), FMov(y) ->
@@ -524,37 +532,24 @@ and g' oc = function
 	## 幸い、lib_asm.sでは等号比較はしなくてもなんとかなるので問題ない 
 	(* ラスト２つの引数は順に「ラベル名の接頭辞」「命令名」*)
 	| Tail, IfEq(x, V(y), e1, e2) ->
-% if isUse("BEQ"):
+## GUI エディタで必須になっているので BEQ にたおす
+% assertAvailable("BEQ")
 		g'_tail_if oc x (pp_id_or_imm (V y)) e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
-% else:
-		g'_tail_if oc x (pp_id_or_imm (V y)) e1 e2 "${getName("BEQ")}" "${getName("BNE")}"
-% endif
 
 	| Tail, IfEq(x, C(0), e1, e2) ->
-% if isUse("BEQ"):
 		g'_tail_if oc x reg_0 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
-% else:
-		g'_tail_if oc x reg_0 e1 e2 "${getName("BEQ")}" "${getName("BNE")}"
-% endif
 
 	| Tail, IfEq(x, C(1), e1, e2) ->
-% if isUse("BEQ"):
 		g'_tail_if oc x reg_p1 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
-% else:
-		g'_tail_if oc x reg_p1 e1 e2 "${getName("BEQ")}" "${getName("BNE")}"
-% endif
 
 	| Tail, IfEq(x, C(-1), e1, e2) ->
-% if isUse("BEQ"):
 		g'_tail_if oc x reg_m1 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
-% else:
-		g'_tail_if oc x reg_m1 e1 e2 "${getName("BEQ")}" "${getName("BNE")}"
-% endif
 
 	| Tail, IfEq(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfEq)"
 
 
+% assertAvailable("BLT")
 	| Tail, IfLE(x, V(y), e1, e2) ->
 		g'_tail_if oc (pp_id_or_imm (V y)) x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
 
@@ -586,42 +581,25 @@ and g' oc = function
 	| Tail, IfGE(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfGE)"
 
+% assertAvailable("FBEQ")
 	| Tail, IfFEq(x, y, e1, e2) ->
-% if isUse("FBEQ"):
 		g'_tail_if oc x y e2 e1 "${getName("FBNE")}" "${getName("FBEQ")}"
-% else:
-		g'_tail_if oc x y e1 e2 "${getName("FBEQ")}" "${getName("FBNE")}"
-% endif
+% assertAvailable("FBLT")
 	| Tail, IfFLE(x, y, e1, e2) ->
 		g'_tail_if oc y x e1 e2 "${getName("FBGE")}" "${getName("FBLT")}"
 
+## BEQ はアサート済
 	| NonTail(z), IfEq(x, V(y), e1, e2) ->
-% if isUse("BEQ"):
 		g'_non_tail_if oc (NonTail(z)) x (pp_id_or_imm (V y)) e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
-% else:
-		g'_non_tail_if oc (NonTail(z)) x (pp_id_or_imm (V y)) e1 e2 "${getName("BEQ")}" "${getName("BNE")}"
-% endif
 
 	| NonTail(z), IfEq(x, C(0), e1, e2) ->
-% if isUse("BEQ"):
 		g'_non_tail_if oc (NonTail(z)) x reg_0 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
-% else:
-		g'_non_tail_if oc (NonTail(z)) x reg_0 e1 e2 "${getName("BEQ")}" "${getName("BNE")}"
-% endif
 
 	| NonTail(z), IfEq(x, C(1), e1, e2) ->
-% if isUse("BEQ"):
 		g'_non_tail_if oc (NonTail(z)) x reg_p1 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
-% else:
-		g'_non_tail_if oc (NonTail(z)) x reg_p1 e1 e2 "${getName("BEQ")}" "${getName("BNE")}"
-% endif
 
 	| NonTail(z), IfEq(x, C(-1), e1, e2) ->
-% if  isUse("BEQ"):
 		g'_non_tail_if oc (NonTail(z)) x reg_m1 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
-% else:
-		g'_non_tail_if oc (NonTail(z)) x reg_m1 e1 e2 "${getName("BEQ")}" "${getName("BNE")}"
-% endif
 
 	| NonTail(z), IfEq(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfEq)"
@@ -660,11 +638,7 @@ and g' oc = function
 
 
 	| NonTail(z), IfFEq(x, y, e1, e2) ->
-% if isUse("FBEQ"):
 		g'_non_tail_if oc (NonTail(z)) x y e2 e1 "${getName("FBNE")}" "${getName("FBEQ")}"
-% else:
-		g'_non_tail_if oc (NonTail(z)) x y e1 e2 "${getName("FBEQ")}" "${getName("FBNE")}"
-% endif
 	| NonTail(z), IfFLE(x, y, e1, e2) ->
 		g'_non_tail_if oc (NonTail(z)) y x e1 e2 "${getName("FBGE")}" "${getName("FBLT")}"
 
