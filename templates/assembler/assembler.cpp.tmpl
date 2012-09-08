@@ -1,7 +1,7 @@
 <%
 
 	def getAddrMode(type):
-		config.getInst(type).get("addressMode", "absolute")
+		return config.getInst(type).get("addressMode", "absolute")
 
 	instsI = filter(lambda inst: inst["formBin"] == 'I' and config.isUse(inst["type"]), instInfo)
 	instsJ = filter(lambda inst: inst["formBin"] == 'J' and config.isUse(inst["type"]), instInfo)

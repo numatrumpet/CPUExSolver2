@@ -847,7 +847,7 @@ let h oc { name = Id.L(x); args = args; fargs = fargs; body = e; ret = ret } =
 let f oc (Prog(fundefs, e)) =
 	Format.eprintf "start generating assembly.@.";
 
-% if constTableType != "no_use":
+% if config.constTableType != "no_use":
 	Output.add_stmt (Output.Comment (Printf.sprintf ".init_heap_size\t0"));
 % endif
 	Output.add_stmt (Output.Jmp "min_caml_start");
