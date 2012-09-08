@@ -21,10 +21,10 @@ compiler: $(DSTDIR_TOP)
 
 linker: $(DSTDIR_TOP)
 	cd linker; make $(MAKE_OPTION)
-	
+
 assembler: $(DSTDIR_TOP)
 	cd assembler; make $(MAKE_OPTION)
-	
+
 simulator: $(DSTDIR_TOP)
 	cd simulator; make $(MAKE_OPTION)
 

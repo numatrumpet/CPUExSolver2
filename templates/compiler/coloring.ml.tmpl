@@ -1,10 +1,4 @@
-<%
-	r = xmlroot.find(".//intRegs").get("prefix") % ()
-	f = xmlroot.find(".//floatRegs").get("prefix") % ()
-	zeroReg = r + xmlroot.find(".//zeroReg").get("index")
-	intRegsNum = xmlroot.find(".//intRegs").get("num")
-	floatRegsNum = xmlroot.find(".//floatRegs").get("num")
-%>(* 干渉グラフの彩色 *)
+(* 干渉グラフの彩色 *)
 (* 「最新コンパイラ構成技法」p226 - p231参照 *)
 open Block
 
@@ -13,9 +7,9 @@ open Block
 (******************)
 (* 関数内で登場する変数とその型 *)
 let varenv = ref M.empty 
-(* ${r}0 - ${r}${intRegsNum} *)
+(* ${config.r}0 - ${config.r}${config.intRegsNum} *)
 let anyregs = Array.to_list (Asm.anyregs)
-(* ${f}0 - ${f}${floatRegsNum} *)
+(* ${config.f}0 - ${config.f}${config.floatRegsNum} *)
 let anyfregs = Array.to_list (Asm.anyfregs)
 (* 割り当てにつかえない整数レジスタ *)
 let invalid_regs = Block.diff_list anyregs Asm.allregs
@@ -145,7 +139,7 @@ let get_var_type stmt =
 		| CallDir (xt, Id.L name, args, fargs) -> [xt] @ (List.map (fun x -> (x, Type.Int)) args) @ (List.map (fun x -> (x, Type.Float)) fargs)
 
 (* Mov系の命令か *)
-(* ただし、${f}16とか割り当てに使われないレジスタを含むMov命令は無効とする *)
+(* ただし、${config.f}16とか割り当てに使われないレジスタを含むMov命令は無効とする *)
 let is_move_instruction stmt = 
 	match stmt.sInst with
 		| Mov ((x, _), y)(* when not (List.mem x invalid_regs) && not (List.mem y invalid_regs)*) -> true
@@ -215,7 +209,7 @@ let set_varenv fundef =
 	(* 浮動小数引数 + 浮動小数レジスタ *)
 	List.iter (fun x -> varenv := M.add x Type.Float !varenv) (fundef.fFargs @ anyfregs);
 	(* ダミーレジスタ *)
-	varenv := M.add "${zeroReg}" Type.Unit !varenv(*;
+	varenv := M.add "${config.zeroReg}" Type.Unit !varenv(*;
 
 	(if fundef.fName = Id.L "print_int.344" && !spill_cnt = 2 then
 		assert (M.mem "Ti100.423.690" !varenv) 
@@ -489,7 +483,7 @@ let choose_color fundef n ok_colors =
 				else if px = pm then (
 					(* ポイントが同じなら番号の若いレジスタを選ぶ *)
 					let typ = Block.find_assert "CHOOSE_COLOR(x) : " x !varenv in
-					let prefix_len = String.length (if typ = Type.Float then "${f}" else "${r}") in
+					let prefix_len = String.length (if typ = Type.Float then "${config.f}" else "${config.r}") in
 					let nx = int_of_string (String.sub x prefix_len (String.length x - prefix_len)) in
 					let nm = int_of_string (String.sub m prefix_len (String.length m - prefix_len)) in
 					if nx < nm then (x, px)
@@ -540,7 +534,7 @@ let insert_save_arg fundef x =
 	let new_stmt = {
 		sId = id;
 		sParent = blk.bId;
-		sInst = Save (("${zeroReg}", Type.Unit), x, x);
+		sInst = Save (("${config.zeroReg}", Type.Unit), x, x);
 		sPred = "";
 		sSucc = stmt.sId;
 		sLivein = S.empty;
@@ -572,7 +566,7 @@ let insert_save2 fundef blk stmt x new_temp =
 	let new_stmt = {
 		sId = id;
 		sParent = target_blk.bId;
-		sInst = Save (("${zeroReg}", Type.Unit), new_temp, x);
+		sInst = Save (("${config.zeroReg}", Type.Unit), new_temp, x);
 		sPred = "";
 		sSucc = if target_stmt = None then "" else (get_some target_stmt).sId;
 		sLivein = S.empty;
@@ -608,7 +602,7 @@ let insert_save fundef (blk_id, stmt_id) x new_temp =
 		let new_stmt = {
 			sId = id;
 			sParent = blk.bId;
-			sInst = Save (("${zeroReg}", Type.Unit), new_temp, x);
+			sInst = Save (("${config.zeroReg}", Type.Unit), new_temp, x);
 			sPred = stmt.sId;
 			sSucc = stmt.sSucc;
 			sLivein = S.empty;

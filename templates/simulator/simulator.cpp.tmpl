@@ -1,57 +1,14 @@
 <%
 	debug_flg = False
 
-	binary = xmlroot.find(".//binary")
-	constTableType = binary.get("constTableType")
-	constTableTag = binary.get("tag", "0xffFFffFF")
-	addressing = binary.get("addressing")
-	rom_addressing = binary.get("rom_addressing")
-	
-	zeroReg = xmlroot.find(".//zeroReg").get("index")
-	assert zeroReg.isdigit(), "zeroReg is not digit"
-
-	frameReg = xmlroot.find(".//frameReg").get("index")
-	assert frameReg is not None, "frameReg is None"
-	assert frameReg.isdigit(), "frameReg is not digit"
-
-	heapReg = xmlroot.find(".//heapReg").get("index")
-	assert heapReg is not None, "heapReg is None"
-	assert heapReg.isdigit(), "heapReg is not digit"
-
-	linkReg = xmlroot.find(".//linkReg").get("index")
-	assert linkReg is not None, "linkReg is None"
-	## リンクレジスタのindexが整数でないときは専用レジスタを使用する
-	
-	def getInst(type):
-		inst = xmlroot.find(".//" + type)
-		assert inst is not None, "inst is None(" + type + ")"
-		return inst
-	
-	def getName(type):
-		name = getInst(type).get("name")
-		name is not None, "name is None(" + type + ")"
-		return name
-	
-	def getOp(type):
-		t_op = getInst(type).get("op")
-		t_op is not None, "name is None(" + type + ")"
-		return getName(type).upper() if not t_op.isalpha() else t_op
-			
-	def getFunct(type):
-		return getName(type).upper() + "_F"
-
-	def isUse(type):
-		use = getInst(type).get("use", "true")
-		return use != "false"
-			
 	def getInstsByOp(op):
-		return filter(lambda inst: isUse(inst["type"]) and getOp(inst["type"]) == op, instInfo)
+		return filter(lambda inst: config.isUse(inst["type"]) and config.getOp(inst["type"]) == op, instInfo)
 
 	def getInstsWithoutConstOp():
-		return filter(lambda inst: isUse(inst["type"]) and not getInst(inst["type"]).get("op").isalpha(), instInfo)
+		return filter(lambda inst: config.isUse(inst["type"]) and not config.getInst(inst["type"]).get("op").isalpha(), instInfo)
 
 	def getArgs(formAsm):
-		xml_formAsm = getInst(inst["type"]).get("formAsm")
+		xml_formAsm = config.getInst(inst["type"]).get("formAsm")
 		if xml_formAsm is not None:
 			xml_formAsm_list = filter(lambda x: x != "", map(lambda x: x.strip(), xml_formAsm.split(',')))
 			if len(xml_formAsm_list) == len(formAsm):
@@ -61,11 +18,6 @@
 			"arg1" : "" if len(formAsm) <= 1 else formAsm[1],
 			"arg2" : "" if len(formAsm) <= 2 else formAsm[2]
 		 }
-
-	constOps = xmlroot.find(".//CONST")
-	
-	endian = xmlroot.find(".//binary").get("endian")
-	assert endian is not None, "endian is None"
 %>#include "../include/common.h"
 #include <cmath>
 #include <cassert>
@@ -99,7 +51,7 @@ int32_t get_imm(uint32_t inst)
 int32_t ireg[INTREG_NUM];
 // 浮動小数レジスタ
 uint32_t freg[INTREG_NUM];
-% if not linkReg.isdigit():
+% if not config.useLinkReg:
 ## 特別にリンクレジスタを用意する場合
 // リンクレジスタ
 uint32_t lreg;
@@ -120,26 +72,38 @@ uint32_t lreg;
 // rd（浮動小数レジスタ）
 #define FRD freg[get_rd(inst)]
 // フレームレジスタ
-#define ZR ireg[${zeroReg}] 
+#define ZR ireg[${config.zeroRegNumber}] 
 // ヒープレジスタ
-#define FR ireg[${frameReg}]
+#define FR ireg[${config.frameRegNumber}]
 // ゼロレジスタ
-#define HR ireg[${heapReg}]
+#define HR ireg[${config.heapRegNumber}]
 // リンクレジスタ
-#define LR ${"ireg[" + linkReg + "]" if linkReg.isdigit() else "lreg"}
+#define LR ${"ireg[" + config.linkRegNumber + "]" if config.useLinkReg else "lreg"}
 
 //------------------------------------------------------------------
 
 // アドレスをバイト/ワードアドレッシングに応じて変換
-#define addr(x) (x${"" if addressing == "byte" else "/*"} / 4${"" if addressing == "byte" else "*/"})
-#define rom_addr(x) (x${"" if rom_addressing == "byte" else "/*"} / 4${"" if rom_addressing == "byte" else "*/"})
-#define ADDRESSING_UNIT	${"4" if addressing == "byte" else "1"}
-#define ROM_ADDRESSING_UNIT	${"4" if rom_addressing == "byte" else "1"}
+% if config.isByteAddressing:
+#define addr(x) (x/4)
+#define ADDRESSING_UNIT 4
+% else:
+#define addr(x) (x)
+#define ADDRESSING_UNIT 1
+% endif
+
+% if config.romIsByteAddressing:
+#define rom_addr(x) (x/4)
+#define ROM_ADDRESSING_UNIT 4
+% else:
+#define rom_addr(x) (x)
+#define ROM_ADDRESSING_UNIT 1
+% endif
 
 //------------------------------------------------------------------
 
 // 停止命令か
-#define isHalt(opcode, funct) (opcode == ${getOp("HALT")}${" && funct == " + getFunct("HALT") if getInst("HALT").get("funct") is not None and not getInst("HALT").get("funct").isalpha() else ""})
+<% halt = config.getInst("HALT") %>
+#define isHalt(opcode, funct) (opcode == ${config.getOp("HALT")}${" && funct == " + config.getFunct("HALT") if halt.get("funct") is not None and not halt.get("funct").isalpha() else ""})
 
 // 発行命令数
 long long unsigned cnt;
@@ -263,7 +227,7 @@ float asF(uint32_t r)
 
 #define toggle_endian(data) ((data << 24) | ((data << 8) & 0x00ff0000) | ((data >> 8) & 0x0000ff00) | ((data >> 24) & 0x000000ff))
 
-% if constTableType != "no_use":
+% if config.constTableType != "no_use":
 //-----------------------------------------------------------------------------
 //
 // 定数テーブルをヒープに書き込む
@@ -271,28 +235,28 @@ float asF(uint32_t r)
 //-----------------------------------------------------------------------------
 void initializeHeap()
 {
-	% if constTableType == "writeSize":
+	% if config.constTableType == "writeSize":
 	// バイナリの最初の１ワード目に定数テーブルのサイズが書かれている
-	int heapSize = ${"toggle_endian(ROM[0])" if endian == "BIG" else "ROM[0]"};
+	int heapSize = ${"toggle_endian(ROM[0])" if config.endian == "BIG" else "ROM[0]"};
 	pc += ROM_ADDRESSING_UNIT;
 //	cerr << "heapSize = " << heapSize << endl;
 	while (heapSize > 0)
 	{
 		assert(rom_addr(pc) >= 0);
 		assert(rom_addr(HR) >= 0);
-		RAM[addr(HR)] = ${"toggle_endian(ROM[rom_addr(pc)])" if endian == "BIG" else "ROM[rom_addr(pc)]"};
+		RAM[addr(HR)] = ${"toggle_endian(ROM[rom_addr(pc)])" if config.endian == "BIG" else "ROM[rom_addr(pc)]"};
 		heapSize -= ADDRESSING_UNIT;
 		HR += ADDRESSING_UNIT;
 		pc += ROM_ADDRESSING_UNIT;
 	}
-	% elif constTableType == "toTag":
+	% elif config.constTableType == "toTag":
 	// constTableTagが来るまでを定数テーブルとする
 	assert(rom_addr(pc) >= 0);
-	while (${"toggle_endian(ROM[rom_addr(pc)])" if endian == "BIG" else "ROM[rom_addr(pc)]"} != ${constTableTag})
+	while (${"toggle_endian(ROM[rom_addr(pc)])" if config.endian == "BIG" else "ROM[rom_addr(pc)]"} != ${config.tag})
 	{
 		assert(rom_addr(pc) >= 0);
 		assert(rom_addr(HR) >= 0);
-		RAM[addr(HR)] = ${"toggle_endian(ROM[rom_addr(pc)])" if endian == "BIG" else "ROM[rom_addr(pc)]"};
+		RAM[addr(HR)] = ${"toggle_endian(ROM[rom_addr(pc)])" if config.endian == "BIG" else "ROM[rom_addr(pc)]"};
 		HR += ADDRESSING_UNIT;
 		pc += ROM_ADDRESSING_UNIT;
 	}
@@ -330,7 +294,7 @@ int simulate(char* srcPath)
 	
 	cerr << srcPath << endl;
 
-% if constTableType != "no_use":
+% if config.constTableType != "no_use":
 	// ヒープの初期化
 	initializeHeap();
 
@@ -345,17 +309,17 @@ int simulate(char* srcPath)
 		// フレーム/ヒープレジスタは絶対に負になることはない
 		if (FR < 0)
 		{
-			cerr << "error> Frame Register(reg[${frameReg}]) has become less than 0." << endl;
+			cerr << "error> Frame Register(reg[${config.frameRegNumber}]) has become less than 0." << endl;
 			break;
 		}
 		if(HR < 0) 
 		{
-			cerr << "error> Heap Register(reg[${heapReg}]) has become less than 0." << endl;
+			cerr << "error> Heap Register(reg[${config.heapRegNumber}]) has become less than 0." << endl;
 			break;
 		}
 
 		assert(rom_addr(pc) >= 0);
-		inst = ${"toggle_endian(ROM[rom_addr(pc)])" if endian == "BIG" else "ROM[rom_addr(pc)]"};
+		inst = ${"toggle_endian(ROM[rom_addr(pc)])" if config.endian == "BIG" else "ROM[rom_addr(pc)]"};
 
 		opcode = get_opcode(inst);
 		funct = get_funct(inst);
@@ -387,14 +351,15 @@ int simulate(char* srcPath)
 		// 読み込んだopcode・functに対応する命令を実行する
 		switch(opcode)
 		{
-% for constOp in constOps.getiterator()[1:]:
+% if config.constOps is not None:
+% for constOp in config.constOps.getiterator()[1:]:
 			case ${constOp.tag}:
 				switch (funct)
 				{
 	% for inst in getInstsByOp(constOp.tag):
-					case ${getName(inst["type"]).upper()}_F:
+					case ${config.getName(inst["type"]).upper()}_F:
 		% if debug_flg:
-						cerr << "${getName(inst["type"])} " << endl;
+						cerr << "${config.getName(inst["type"])} " << endl;
 						cerr << "\trs = " << get_rs(inst) << ", " << IRS << endl;
 						cerr << "\trt = " << get_rt(inst) << ", " << IRT << endl;
 						cerr << "\trd = " << get_rd(inst) << ", " << IRD << endl;
@@ -411,10 +376,11 @@ int simulate(char* srcPath)
 				}			
 				break;
 % endfor
+% endif
 % for inst in getInstsWithoutConstOp():
-			case ${getName(inst["type"]).upper()}:
+			case ${config.getName(inst["type"]).upper()}:
 	% if debug_flg:
-				cerr << "${getName(inst["type"])} " << endl;
+				cerr << "${config.getName(inst["type"])} " << endl;
 				cerr << "\trs = " << get_rs(inst) << ", " << IRS << endl;
 				cerr << "\trt = " << get_rt(inst) << ", " << IRT << endl;
 				cerr << "\trd = " << get_rd(inst) << ", " << IRD << endl;
@@ -431,7 +397,7 @@ int simulate(char* srcPath)
 				break;
 		}
 	}
-	while (!isHalt(opcode, funct)); // ${xmlroot.find(".//HALT").get("name")}が来たら終了
+	while (!isHalt(opcode, funct)); // ${config.getName("HALT")}が来たら終了
 
 	// 発行命令数を表示
 	cerr << "\n" << cnt << " instructions had been issued" << endl;

@@ -1,12 +1,4 @@
 <%
-	r = xmlroot.find(".//intRegs").get("prefix") % ()
-	f = xmlroot.find(".//floatRegs").get("prefix") % ()
-	comment = xmlroot.find(".//comment").get("text")
-	direction =  xmlroot.find(".//binary").get("direction")
-	constTableType = xmlroot.find(".//binary").get("constTableType").strip()
-	addressing = xmlroot.find(".//binary").get("addressing")
-	addressingUnit = 4 if addressing == "byte" else 1
-	
 	## fsinやfcosなどがつかえたら、定義された関数ではなくコマンドを呼び出すようにする
 	## そのために使うデータ
 	fpis = [
@@ -20,54 +12,37 @@
 		{"type" : "ITOF", "funs" : ["min_caml_float_of_int"]}
 	]
 
-	def getInst(type):
-		inst = xmlroot.find(".//" + type)
-		assert inst is not None, "inst is None(" + type + ")"
-		return inst
-	
-	def getName(type):
-		name = getInst(type).get("name")
-		name is not None, "name is None(" + type + ")"
-		return name
-
-	def isUse(type):
-		use = getInst(type).get("use", "true")
-		return use != "false"
-
-  def assertAvailable(type):
-		assert isUse(type), "[emit] %s must be supported." % (getName(type))
-
 	def call(label):
-		if  isUse("CALL") and isUse("CALLREG") and isUse("RETURN"):
-			return "%s %s" % (getName("CALL"), label)
+		if config.isUse("CALL") and config.isUse("CALLREG") and config.isUse("RETURN"):
+			return "%s %s" % (config.getName("CALL"), label)
 		else:
-	    assertAvailable("JMP_LNK")
-			assertAvailable("JMPREG_LNK")
-			ans = "%s %s, %s, 0\n" % (getName("STI"), LR, FR)
+			config.assertAvailable("JMP_LNK")
+			config.assertAvailable("JMPREG_LNK")
+			ans = "%s %s, %s, 0\n" % (config.getName("STI"), LR, FR)
 			ans += "\t" + (addi(FR, FR, -addressingUnit)) + "\n"
-			ans += "\t%s %s\n" % (getName("JMP_LNK"), label)
+			ans += "\t%s %s\n" % (config.getName("JMP_LNK"), label)
 			ans += "\t" + (addi(FR, FR, addressingUnit)) + "\n"
-			ans += "\t%s %s, %s, 0" % (getName("LDI"), LR, FR)
+			ans += "\t%s %s, %s, 0" % (config.getName("LDI"), LR, FR)
 			return ans
 		
 	def callR(rs):
-		if  isUse("CALL") and isUse("CALLREG") and isUse("RETURN"):
-			return "%s %s" % (getName("CALLREG"), rs)
+		if config.isUse("CALL") and config.isUse("CALLREG") and config.isUse("RETURN"):
+			return "%s %s" % (config.getName("CALLREG"), rs)
 		else:
-	    assertAvailable("JMP_LNK")
-			assertAvailable("JMPREG_LNK")
-			ans = "%s %s, %s, 0\n" % (getName("STI"), LR, FR)
+			config.assertAvailable("JMP_LNK")
+			config.assertAvailable("JMPREG_LNK")
+			ans = "%s %s, %s, 0\n" % (config.getName("STI"), LR, FR)
 			ans += "\t" + (addi(FR, FR, -addressingUnit)) + "\n"
-			ans += "\t%s %s\n" % (getName("JMPREG_LNK"), rs)
+			ans += "\t%s %s\n" % (config.getName("JMPREG_LNK"), rs)
 			ans += "\t" + (addi(FR, FR, addressingUnit)) + "\n"
-			ans += "\t%s %s, %s, 0" % (getName("LDI"), LR, FR)
+			ans += "\t%s %s, %s, 0" % (config.getName("LDI"), LR, FR)
 			return ans
 
 	def _return():
-		if  isUse("CALL") and isUse("CALLREG") and isUse("RETURN"):
+		if config.isUse("CALL") and config.isUse("CALLREG") and config.isUse("RETURN"):
 			return "Output.Return"
 		else:
-			assert xmlroot.find(".//linkReg").get("index") != "", "link register must be one of int register in this architecture."
+			assert config.linkReg() != config.r, "link register must be one of int register in this architecture."
 			return "(Output.B reg_lk)"
 	
 %>open Asm
@@ -87,11 +62,11 @@ let save x =
 (* 退避された変数xのスタックにおける位置を取得 *)
 let get_offset x = 
 	try
-		${"4 * " if addressing == "byte" else ""}M.find x !stackmap
+		${"4 * " if config.isByteAddressing else ""}M.find x !stackmap
 	with Not_found -> failwith ("[Emit.get_offset] " ^ x ^ " is not in stackmap.")
 
 (* スタックサイズを取得 *)
-let get_stacksize () = align ${"((M.length !stackmap + 1) * 4)" if addressing == "byte" else "(M.length !stackmap + 1)"}
+let get_stacksize () = align ${"((M.length !stackmap + 1) * 4)" if config.isByteAddressing else "(M.length !stackmap + 1)"}
 
 (* 変数名ないし即値をId.t( = string)型として取得 *)
 let pp_id_or_imm = function
@@ -142,7 +117,7 @@ and g' oc = function
 	| NonTail(_), Nop -> ()
 
 	| NonTail(x), Set(i) ->
-% if isUse("ADDI"):
+% if config.isUse("ADDI"):
 		if i <= -32768 || 32768 < i then (
 			Output.add_stmt (Output.Mvhi (x, (i lsr 16) mod (1 lsl 16)));
 			Output.add_stmt (Output.Mvlo (x, (i mod (1 lsl 16))))
@@ -175,19 +150,24 @@ and g' oc = function
 				let frac = (frac lsl 3) + (hi lsr 29) in
 				(s lsl 31) + (exp lsl 23) + frac
 			) in
-		Output.add_stmt (Output.Comment (Printf.sprintf "\t${comment} %f" f));
-% assertAvailable("SETHI"); assertAvailable("SETLO"); assertAvailable("STI"); assertAvailable("LDI")
-% if isUse("FSETHI") and isUse("FSETLO"):
+		Output.add_stmt (Output.Comment (Printf.sprintf "\t${config.comment} %f" f));
+<%
+  config.assertAvailable("SETHI")
+  config.assertAvailable("SETLO")
+  config.assertAvailable("STI")
+  config.assertAvailable("LDI")
+%>
+% if config.isUse("FSETHI") and config.isUse("FSETLO"):
 		Output.add_stmt (Output.FMvhi (x, (b lsr 16) mod (1 lsl 16)));
 		Output.add_stmt (Output.FMvlo (x, (b mod (1 lsl 16))));
-% elif isUse("ADDI"):
+% elif config.isUse("ADDI"):
 		if -32768 < b && b <= 32768 then (
 		  	Output.add_stmt (Output.Addi (reg_sw, reg_0, b));
 		  	let ss = get_stacksize () in
 		  	Output.add_stmt (Output.Sti (reg_sw, reg_sp, ss));
-	% if isUse("FLDI"):
+	% if config.isUse("FLDI"):
 		  	Output.add_stmt (Output.LdFi (x, reg_sp, ss));
-	% elif isUse("LDI") and isUse("IMOVF"):
+	% elif config.isUse("LDI") and config.isUse("IMOVF"):
 			Output.add_stmt (Output.Ldi (reg_sw, reg_sp, ss));
 			Output.add_stmt (Output.IMovF (x, reg_sw))
 	% else:
@@ -199,9 +179,9 @@ and g' oc = function
 		  	Output.add_stmt (Output.Mvlo (reg_sw, (b mod (1 lsl 16))));
 		  	let ss = get_stacksize () in
 		  	Output.add_stmt (Output.Sti (reg_sw, reg_sp, ss));
-	% if isUse("FLDI"):
+	% if config.isUse("FLDI"):
 		  	Output.add_stmt (Output.LdFi (x, reg_sp, ss));
-	% elif isUse("LDI") and isUse("IMOVF"):
+	% elif config.isUse("LDI") and config.isUse("IMOVF"):
 			Output.add_stmt (Output.Ldi (reg_sw, reg_sp, ss));
 			Output.add_stmt (Output.IMovF (x, reg_sw))
 	% else:
@@ -213,9 +193,9 @@ and g' oc = function
 	  	Output.add_stmt (Output.Mvlo (reg_sw, (b mod (1 lsl 16))));
 	  	let ss = get_stacksize () in
 	  	Output.add_stmt (Output.Sti (reg_sw, reg_sp, ss));
-	% if isUse("FLDI"):
+	% if config.isUse("FLDI"):
 	  	Output.add_stmt (Output.LdFi (x, reg_sp, ss));
-	% elif isUse("LDI") and isUse("IMOVF"):
+	% elif config.isUse("LDI") and config.isUse("IMOVF"):
 		Output.add_stmt (Output.Ldi (reg_sw, reg_sp, ss));
 		Output.add_stmt (Output.IMovF (x, reg_sw))
 	% else:
@@ -226,21 +206,18 @@ and g' oc = function
 	| NonTail(x), Mov(y) when x = y -> ()
 
 	## MOVは少なくともニーモニックとして必ず用意される
-  % assertAvailable("MOV")
 	| NonTail(x), Mov(y) ->
 		Output.add_stmt (Output.Mov (x, y))
 
-  % assertAvailable("SUB")
 	| NonTail(x), Neg(y) -> 
 		Output.add_stmt (Output.Sub (x, reg_0, y))
 
-  % assertAvailable("ADD")
 	| NonTail(x), Add(y, V(z)) ->
 		Output.add_stmt (Output.Add (x, y, z))
 
 	## ADDIはなくてもいい
 	| NonTail(x), Add(y, C(z)) ->
-% if isUse("ADDI"):
+% if config.isUse("ADDI"):
 		Output.add_stmt (Output.Addi (x, y, z))
 % else:
 		Output.add_stmt (Output.Mvhi (reg_sw, (z lsr 16) mod (1 lsl 16)));
@@ -249,13 +226,12 @@ and g' oc = function
 % endif
 
 	## SUBは必須
-  % assertAvailable("SUB")
 	| NonTail(x), Sub(y, V(z)) ->	
 		Output.add_stmt (Output.Sub (x, y, z))
 
 	## SUBIはなくてもいい
 	| NonTail(x), Sub(y, C(z)) ->
-% if isUse("SUBI"):
+% if config.isUse("SUBI"):
 		Output.add_stmt (Output.Subi (x, y, z))
 % else:
 		Output.add_stmt (Output.Mvhi (reg_sw, (z lsr 16) mod (1 lsl 16)));
@@ -264,32 +240,32 @@ and g' oc = function
 % endif
 
 	## mul, muli, div, diviの使用不使用はparser.mlyで調整
+% if config.isUse("MUL"):
 	| NonTail(x), Mul(y, V(z)) ->
-% assertAvailable("SUB")
 		Output.add_stmt (Output.Mul (x, y, z))
 % else:
-		failwith "This architecture does not support ${getName("MUL")}."
+		failwith "This architecture does not support ${config.getName("MUL")}."
 % endif
 
 	| NonTail(x), Mul(y, C(z)) ->
-% if isUse("MULI"):
+% if config.isUse("MULI"):
 		Output.add_stmt (Output.Muli (x, y, z))
 % else:
-		failwith "This architecture does not support ${getName("MULI")}."
+		failwith "This architecture does not support ${config.getName("MULI")}."
 % endif
 
 	| NonTail(x), Div(y, V(z)) ->
-% if isUse("DIV"):
+% if config.isUse("DIV"):
 		Output.add_stmt (Output.Div (x, y, z))
 % else:
-		failwith "This architecture does not support ${getName("DIV")}."
+		failwith "This architecture does not support ${config.getName("DIV")}."
 % endif
 
 	| NonTail(x), Div(y, C(z)) ->
-% if isUse("DIVI"):
+% if config.isUse("DIVI"):
 		Output.add_stmt (Output.Divi (x, y, z))
 % else:
-		failwith "This architecture does not support ${getName("DIVI")}."
+		failwith "This architecture does not support ${config.getName("DIVI")}."
 % endif
 
 	## sll, slli, sraiは必須
@@ -305,7 +281,7 @@ and g' oc = function
 
 	## ld, stはなくても良い
 	| NonTail(x), Ld(y, V z) ->
-% if isUse("LD"):
+% if config.isUse("LD"):
 	% if direction == "toSmall":
 		(* インデックスの符号反転 *)
 		Output.add_stmt (Output.Sub (reg_sw, reg_0, z));
@@ -327,7 +303,7 @@ and g' oc = function
 		Output.add_stmt (Output.Ldi (x, y, z))
 
 	| NonTail(_), St(x, y, V z) ->
-% if isUse("ST"):
+% if config.isUse("ST"):
 	% if direction == "toSmall":
 		(* インデックスの符号反転 *)
 		Output.add_stmt (Output.Sub (reg_sw, reg_0, z));
@@ -354,7 +330,6 @@ and g' oc = function
 
 	## fmov, fneg, fadd, fmulは必須。fsubはなくても良い
 	## fdiv, finvはどちらか少なくとも一方は必要
-% assertAvailable("fmov"); assertAvailable("fneg"); assertAvailable("fadd"); assertAvailable("fmul")
 	| NonTail(x), FMov(y) when x = y -> ()
 
 	| NonTail(x), FMov(y) ->
@@ -367,7 +342,7 @@ and g' oc = function
 		Output.add_stmt (Output.FAdd (x, y, z))
 
 	| NonTail(x), FSub(y, z) ->
-% if isUse("FSUB"):
+% if config.isUse("FSUB"):
 		Output.add_stmt (Output.FSub (x, y, z))
 % else:
 		Output.add_stmt (Output.FNeg (reg_fsw, z));
@@ -378,7 +353,7 @@ and g' oc = function
 		Output.add_stmt (Output.FMul (x, y, z))
 
 	| NonTail(x), FDiv(y, z) ->
-% if isUse("FDIV"):
+% if config.isUse("FDIV"):
 		Output.add_stmt (Output.FDiv (x, y, z))
 % else:
 		Output.add_stmt (Output.FInv (reg_fsw, z));
@@ -387,7 +362,7 @@ and g' oc = function
 
 	## fld, fstはなくても良い
 	| NonTail(x), LdF(y, V(z)) ->
-% if isUse("FLD"):
+% if config.isUse("FLD"):
 	% if direction == "toSmall":
 		(* インデックスの符号反転 *)
 		Output.add_stmt (Output.Sub (reg_sw, reg_0, z));
@@ -402,9 +377,9 @@ and g' oc = function
 	% else:
 		Output.add_stmt (Output.Add (reg_sw, y, z));
 	% endif
-	% if isUse("FLDI"):
+	% if config.isUse("FLDI"):
 		Output.add_stmt (Output.LdFi (x, reg_sw, 0))
-	% elif isUse("LDI") and isUse("IMOVF"):
+	% elif config.isUse("LDI") and config.isUse("IMOVF"):
 		Output.add_stmt (Output.Ldi (reg_sw, reg_sw, 0));
 		Output.add_stmt (Output.IMovF (x, reg_sw))
 	% else:
@@ -413,16 +388,16 @@ and g' oc = function
 % endif	
 
 	| NonTail(x), LdF(y, C(z)) ->
-	% if isUse("FLDI"):
+	% if config.isUse("FLDI"):
 		Output.add_stmt (Output.LdFi (x, y, z))
-	% elif isUse("LDI") and isUse("IMOVF"):
+	% elif config.isUse("LDI") and config.isUse("IMOVF"):
 		Output.add_stmt (Output.Ldi (reg_sw, y, z));
 		Output.add_stmt (Output.IMovF (x, reg_sw))
 	% else:
 		failwith "this architecture must support LdFi or IMovF" 
 	% endif
 	| NonTail(_), StF(x, y, V(z)) ->
-% if isUse("FST"):
+% if config.isUse("FST"):
 	% if direction == "toSmall":
 		(* インデックスの符号反転 *)
 		Output.add_stmt (Output.Sub (reg_sw, reg_0, z));
@@ -437,9 +412,9 @@ and g' oc = function
 	% else:
 		Output.add_stmt (Output.Add (reg_sw, y, z));
 	% endif
-	% if isUse("FSTI"):
+	% if config.isUse("FSTI"):
 		Output.add_stmt (Output.StFi (x, reg_sw, 0))
-	% elif isUse("STI") and isUse("FMOVI"):
+	% elif config.isUse("STI") and config.isUse("FMOVI"):
 		let ss = get_stacksize() in
 		Output.add_stmt (Output.Sti (regs.(0), reg_sp, ss));
 		Output.add_stmt (Output.FMovI (regs.(0), x));
@@ -451,9 +426,9 @@ and g' oc = function
 % endif	
 
 	| NonTail(_), StF(x, y, C(z)) ->
-% if isUse("FSTI"):
+% if config.isUse("FSTI"):
 		Output.add_stmt (Output.StFi (x, y, z))
-% elif isUse("STI") and isUse("FMOVI"):
+% elif config.isUse("STI") and config.isUse("FMOVI"):
 		let ss = get_stacksize() in
 		Output.add_stmt (Output.FMovI (reg_sw, x));
 		Output.add_stmt (Output.Sti (reg_sw, y, z))
@@ -461,7 +436,7 @@ and g' oc = function
 		failwith "this architecture must support LdFi or IMovF" 
 % endif
 	| NonTail(_), Comment(s) ->
-		Output.add_stmt (Output.Comment (Printf.sprintf "\t${comment} %s\n" s))
+		Output.add_stmt (Output.Comment (Printf.sprintf "\t${config.comment} %s\n" s))
 
 	(* 退避の仮想命令 *)
 	| NonTail(_), Save(x, y) when List.mem x (reg_sw :: allregs) && not (M.mem y !stackmap) ->
@@ -472,9 +447,9 @@ and g' oc = function
 	| NonTail(_), Save(x, y) when List.mem x (reg_fsw :: allfregs) && not (M.mem y !stackmap) ->
 		save y;
 		let offset = get_offset y in
-% if isUse("FSTI"):
+% if config.isUse("FSTI"):
 		Output.add_stmt (Output.StFi (x, reg_sp, offset))
-% elif isUse("STI") and isUse("FMOVI"):
+% elif config.isUse("STI") and config.isUse("FMOVI"):
 		let ss = get_stacksize() in
 		Output.add_stmt (Output.FMovI (reg_sw, x));
 		Output.add_stmt (Output.Sti (reg_sw, reg_sp, offset))
@@ -494,9 +469,9 @@ and g' oc = function
 		Output.add_stmt (Output.Ldi (x, reg_sp, (get_offset y)))
 
 	| NonTail(x), Restore(y) when List.mem x allfregs ->
-	% if isUse("FLDI"):
+	% if config.isUse("FLDI"):
 		Output.add_stmt (Output.LdFi (x, reg_sp, (get_offset y)))
-	% elif isUse("LDI") and isUse("IMOVF"):
+	% elif config.isUse("LDI") and config.isUse("IMOVF"):
 		Output.add_stmt (Output.Ldi (reg_sw, reg_sp, (get_offset y)));
 		Output.add_stmt (Output.IMovF (x, reg_sw))
 	% else:
@@ -533,114 +508,110 @@ and g' oc = function
 	(* ラスト２つの引数は順に「ラベル名の接頭辞」「命令名」*)
 	| Tail, IfEq(x, V(y), e1, e2) ->
 ## GUI エディタで必須になっているので BEQ にたおす
-% assertAvailable("BEQ")
-		g'_tail_if oc x (pp_id_or_imm (V y)) e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
+		g'_tail_if oc x (pp_id_or_imm (V y)) e2 e1 "${config.getName("BNE")}" "${config.getName("BEQ")}"
 
 	| Tail, IfEq(x, C(0), e1, e2) ->
-		g'_tail_if oc x reg_0 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
+		g'_tail_if oc x reg_0 e2 e1 "${config.getName("BNE")}" "${config.getName("BEQ")}"
 
 	| Tail, IfEq(x, C(1), e1, e2) ->
-		g'_tail_if oc x reg_p1 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
+		g'_tail_if oc x reg_p1 e2 e1 "${config.getName("BNE")}" "${config.getName("BEQ")}"
 
 	| Tail, IfEq(x, C(-1), e1, e2) ->
-		g'_tail_if oc x reg_m1 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
+		g'_tail_if oc x reg_m1 e2 e1 "${config.getName("BNE")}" "${config.getName("BEQ")}"
 
 	| Tail, IfEq(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfEq)"
 
 
-% assertAvailable("BLT")
 	| Tail, IfLE(x, V(y), e1, e2) ->
-		g'_tail_if oc (pp_id_or_imm (V y)) x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
+		g'_tail_if oc (pp_id_or_imm (V y)) x e1 e2 "${config.getName("BLE")}" "${config.getName("BLT")}"
 
 	| Tail, IfLE(x, C(0), e1, e2) ->
-		g'_tail_if oc reg_0 x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
+		g'_tail_if oc reg_0 x e1 e2 "${config.getName("BLE")}" "${config.getName("BLT")}"
 
 	| Tail, IfLE(x, C(1), e1, e2) ->
-		g'_tail_if oc reg_p1 x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
+		g'_tail_if oc reg_p1 x e1 e2 "${config.getName("BLE")}" "${config.getName("BLT")}"
 
 	| Tail, IfLE(x, C(-1), e1, e2) ->
-		g'_tail_if oc reg_m1 x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
+		g'_tail_if oc reg_m1 x e1 e2 "${config.getName("BLE")}" "${config.getName("BLT")}"
 
 	| Tail, IfLE(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfLE)"
 
 
 	| Tail, IfGE(x, V(y), e1, e2) ->
-		g'_tail_if oc x (pp_id_or_imm (V y)) e1 e2 "${getName("BGE")}" "${getName("BLT")}"
+		g'_tail_if oc x (pp_id_or_imm (V y)) e1 e2 "${config.getName("BGE")}" "${config.getName("BLT")}"
 
 	| Tail, IfGE(x, C(0), e1, e2) ->
-		g'_tail_if oc x reg_0 e1 e2 "${getName("BGE")}" "${getName("BLT")}"
+		g'_tail_if oc x reg_0 e1 e2 "${config.getName("BGE")}" "${config.getName("BLT")}"
 
 	| Tail, IfGE(x, C(1), e1, e2) ->
-		g'_tail_if oc x reg_p1 e1 e2 "${getName("BGE")}" "${getName("BLT")}"
+		g'_tail_if oc x reg_p1 e1 e2 "${config.getName("BGE")}" "${config.getName("BLT")}"
 
 	| Tail, IfGE(x, C(-1), e1, e2) ->
-		g'_tail_if oc x reg_m1 e1 e2 "${getName("BGE")}" "${getName("BLT")}"
+		g'_tail_if oc x reg_m1 e1 e2 "${config.getName("BGE")}" "${config.getName("BLT")}"
 
 	| Tail, IfGE(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfGE)"
 
-% assertAvailable("FBEQ")
 	| Tail, IfFEq(x, y, e1, e2) ->
-		g'_tail_if oc x y e2 e1 "${getName("FBNE")}" "${getName("FBEQ")}"
-% assertAvailable("FBLT")
+		g'_tail_if oc x y e2 e1 "${config.getName("FBNE")}" "${config.getName("FBEQ")}"
 	| Tail, IfFLE(x, y, e1, e2) ->
-		g'_tail_if oc y x e1 e2 "${getName("FBGE")}" "${getName("FBLT")}"
+		g'_tail_if oc y x e1 e2 "${config.getName("FBGE")}" "${config.getName("FBLT")}"
 
 ## BEQ はアサート済
 	| NonTail(z), IfEq(x, V(y), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x (pp_id_or_imm (V y)) e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
+		g'_non_tail_if oc (NonTail(z)) x (pp_id_or_imm (V y)) e2 e1 "${config.getName("BNE")}" "${config.getName("BEQ")}"
 
 	| NonTail(z), IfEq(x, C(0), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x reg_0 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
+		g'_non_tail_if oc (NonTail(z)) x reg_0 e2 e1 "${config.getName("BNE")}" "${config.getName("BEQ")}"
 
 	| NonTail(z), IfEq(x, C(1), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x reg_p1 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
+		g'_non_tail_if oc (NonTail(z)) x reg_p1 e2 e1 "${config.getName("BNE")}" "${config.getName("BEQ")}"
 
 	| NonTail(z), IfEq(x, C(-1), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x reg_m1 e2 e1 "${getName("BNE")}" "${getName("BEQ")}"
+		g'_non_tail_if oc (NonTail(z)) x reg_m1 e2 e1 "${config.getName("BNE")}" "${config.getName("BEQ")}"
 
 	| NonTail(z), IfEq(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfEq)"
 
 
 	| NonTail(z), IfLE(x, V(y), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) (pp_id_or_imm (V y)) x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
+		g'_non_tail_if oc (NonTail(z)) (pp_id_or_imm (V y)) x e1 e2 "${config.getName("BLE")}" "${config.getName("BLT")}"
 
 	| NonTail(z), IfLE(x, C(0), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) reg_0 x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
+		g'_non_tail_if oc (NonTail(z)) reg_0 x e1 e2 "${config.getName("BLE")}" "${config.getName("BLT")}"
 
 	| NonTail(z), IfLE(x, C(1), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) reg_p1 x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
+		g'_non_tail_if oc (NonTail(z)) reg_p1 x e1 e2 "${config.getName("BLE")}" "${config.getName("BLT")}"
 
 	| NonTail(z), IfLE(x, C(-1), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) reg_m1 x e1 e2 "${getName("BLE")}" "${getName("BLT")}"
+		g'_non_tail_if oc (NonTail(z)) reg_m1 x e1 e2 "${config.getName("BLE")}" "${config.getName("BLT")}"
 
 	| NonTail(z), IfLE(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfLE)"
 
 
 	| NonTail(z), IfGE(x, V(y), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x (pp_id_or_imm (V y)) e1 e2 "${getName("BGE")}" "${getName("BLT")}"
+		g'_non_tail_if oc (NonTail(z)) x (pp_id_or_imm (V y)) e1 e2 "${config.getName("BGE")}" "${config.getName("BLT")}"
 
 	| NonTail(z), IfGE(x, C(0), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x reg_0 e1 e2 "${getName("BGE")}" "${getName("BLT")}"
+		g'_non_tail_if oc (NonTail(z)) x reg_0 e1 e2 "${config.getName("BGE")}" "${config.getName("BLT")}"
 
 	| NonTail(z), IfGE(x, C(1), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x reg_p1 e1 e2 "${getName("BGE")}" "${getName("BLT")}"
+		g'_non_tail_if oc (NonTail(z)) x reg_p1 e1 e2 "${config.getName("BGE")}" "${config.getName("BLT")}"
 
 	| NonTail(z), IfGE(x, C(-1), e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x reg_m1 e1 e2 "${getName("BGE")}" "${getName("BLT")}"
+		g'_non_tail_if oc (NonTail(z)) x reg_m1 e1 e2 "${config.getName("BGE")}" "${config.getName("BLT")}"
 
 	| NonTail(z), IfGE(x, C(y), e1, e2) ->
 		failwith "can't use immediate in the branch operations.(IfGE)"
 
 
 	| NonTail(z), IfFEq(x, y, e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) x y e2 e1 "${getName("FBNE")}" "${getName("FBEQ")}"
+		g'_non_tail_if oc (NonTail(z)) x y e2 e1 "${config.getName("FBNE")}" "${config.getName("FBEQ")}"
 	| NonTail(z), IfFLE(x, y, e1, e2) ->
-		g'_non_tail_if oc (NonTail(z)) y x e1 e2 "${getName("FBGE")}" "${getName("FBLT")}"
+		g'_non_tail_if oc (NonTail(z)) y x e1 e2 "${config.getName("FBGE")}" "${config.getName("FBLT")}"
 
 
 	(* 関数呼び出しの仮想命令の実装 (caml2html: emit_call) *)
@@ -654,17 +625,17 @@ and g' oc = function
 
 	| Tail, CallDir(Id.L(x), ys, zs) -> (* 末尾呼び出し *)
 		(match x with
-% for fpi in filter(lambda fpi: isUse(fpi["type"]), fpis):
+% for fpi in filter(lambda fpi: config.isUse(fpi["type"]), fpis):
 	% for funName in fpi["funs"]:
 	  		| "${funName}"
 	% endfor
 			->
-				Output.add_stmt (Output.FPI ("${getName(fpi["type"])}", ${"regs.(0)" if fpi["type"] in ["FTOI"] else "fregs.(0)"}, (assert (List.length ${"ys" if fpi["type"] in ["ITOF"] else "zs"} > 0); List.hd ${"ys" if fpi["type"] in ["ITOF"] else "zs"})));
+				Output.add_stmt (Output.FPI ("${config.getName(fpi["type"])}", ${"regs.(0)" if fpi["type"] in ["FTOI"] else "fregs.(0)"}, (assert (List.length ${"ys" if fpi["type"] in ["ITOF"] else "zs"} > 0); List.hd ${"ys" if fpi["type"] in ["ITOF"] else "zs"})));
 				Output.add_stmt ${_return()}
 % endfor
 		  	| "min_caml_print_newline" ->
 				g'_args oc x [] ys zs;
-% if isUse("ADDI"):
+% if config.isUse("ADDI"):
 				Output.add_stmt (Output.Addi (regs.(0), reg_0, 10));
 % else:
 				Output.add_stmt (Output.Mvhi (regs.(0), 0));
@@ -689,8 +660,8 @@ and g' oc = function
 		g'_args oc x [(x, reg_cl)] ys zs;
 		let ss = get_stacksize () in
 		
-% if  isUse("CALL") and isUse("CALLREG") and isUse("RETURN"):
-	% if isUse("SUBI"):
+% if  config.isUse("CALL") and config.isUse("CALLREG") and config.isUse("RETURN"):
+	% if config.isUse("SUBI"):
 		Output.add_stmt (Output.Subi (reg_sp, reg_sp, ss));
 	% else:
 		Output.add_stmt (Output.Mvhi (reg_sw, (ss lsr 16) mod (1 lsl 16)));
@@ -699,7 +670,7 @@ and g' oc = function
 	% endif
 		Output.add_stmt (Output.Ldi (reg_sw, reg_cl, 0));
 		Output.add_stmt (Output.CallR reg_sw);
-	% if isUse("ADDI"):
+	% if config.isUse("ADDI"):
 		Output.add_stmt (Output.Addi (reg_sp, reg_sp, ss)); 
 	% else:
 		Output.add_stmt (Output.Mvhi (reg_sw, (ss lsr 16) mod (1 lsl 16)));
@@ -708,20 +679,20 @@ and g' oc = function
 	% endif
 % else:
 		Output.add_stmt (Output.Sti (reg_lk, reg_sp, ss));
-	% if isUse("SUBI"):
-		Output.add_stmt (Output.Subi (reg_sp, reg_sp, ss + ${addressingUnit}));
+	% if config.isUse("SUBI"):
+		Output.add_stmt (Output.Subi (reg_sp, reg_sp, ss + ${config.addressingUnit}));
 	% else:
-		Output.add_stmt (Output.Mvhi (reg_sw, ((ss + ${addressingUnit}) lsr 16) mod (1 lsl 16)));
-		Output.add_stmt (Output.Mvlo (reg_sw, (ss + ${addressingUnit}) mod (1 lsl 16)));
+		Output.add_stmt (Output.Mvhi (reg_sw, ((ss + ${config.addressingUnit}) lsr 16) mod (1 lsl 16)));
+		Output.add_stmt (Output.Mvlo (reg_sw, (ss + ${config.addressingUnit}) mod (1 lsl 16)));
 		Output.add_stmt (Output.Sub (reg_sp, reg_sp, reg_sw));
 	% endif
 		Output.add_stmt (Output.Ldi (reg_sw, reg_cl, 0));
 		Output.add_stmt (Output.Jarl reg_sw);
-	% if isUse("ADDI"):
-		Output.add_stmt (Output.Addi (reg_sp, reg_sp, ss + ${addressingUnit})); 
+	% if config.isUse("ADDI"):
+		Output.add_stmt (Output.Addi (reg_sp, reg_sp, ss + ${config.addressingUnit})); 
 	% else:
-		Output.add_stmt (Output.Mvhi (reg_sw, ((ss + ${addressingUnit}) lsr 16) mod (1 lsl 16)));
-		Output.add_stmt (Output.Mvlo (reg_sw, (ss + ${addressingUnit}) mod (1 lsl 16)));
+		Output.add_stmt (Output.Mvhi (reg_sw, ((ss + ${config.addressingUnit}) lsr 16) mod (1 lsl 16)));
+		Output.add_stmt (Output.Mvlo (reg_sw, (ss + ${config.addressingUnit}) mod (1 lsl 16)));
 		Output.add_stmt (Output.Add (reg_sp, reg_sp, reg_sw));
 	% endif
 		Output.add_stmt (Output.Ldi (reg_lk, reg_sp, ss));
@@ -734,17 +705,17 @@ and g' oc = function
 
   | NonTail(a), CallDir(Id.L(x), ys, zs) -> (* ラベルで飛ぶジャンプ *)
 	  	(match x with
-% for fpi in filter(lambda fpi: isUse(fpi["type"]), fpis):
+% for fpi in filter(lambda fpi: config.isUse(fpi["type"]), fpis):
 	% for funName in fpi["funs"]:
 	  		| "${funName}"
 	% endfor
 			->
-				Output.add_stmt (Output.FPI ("${getName(fpi["type"])}", a, (assert (List.length ${"ys" if fpi["type"] in ["ITOF"] else "zs"} > 0); List.hd ${"ys" if fpi["type"] in ["ITOF"] else "zs"})))
+				Output.add_stmt (Output.FPI ("${config.getName(fpi["type"])}", a, (assert (List.length ${"ys" if fpi["type"] in ["ITOF"] else "zs"} > 0); List.hd ${"ys" if fpi["type"] in ["ITOF"] else "zs"})))
 % endfor
 		  	| "min_caml_print_newline" ->
 				let ss = get_stacksize () in
 				Output.add_stmt (Output.Sti (regs.(0), reg_sp, ss));
-% if isUse("ADDI"):
+% if config.isUse("ADDI"):
 				Output.add_stmt (Output.Addi (regs.(0), reg_0, 10));
 % else:
 				Output.add_stmt (Output.Mvhi (regs.(0), 0));
@@ -761,8 +732,8 @@ and g' oc = function
 			| _ ->
 				g'_args oc x [] ys zs;
 				let ss = get_stacksize () in
-% if  isUse("CALL") and isUse("CALLREG") and isUse("RETURN"):
-	% if isUse("SUBI"):
+% if  config.isUse("CALL") and config.isUse("CALLREG") and config.isUse("RETURN"):
+	% if config.isUse("SUBI"):
 				Output.add_stmt (Output.Subi (reg_sp, reg_sp, ss));
 	% else:
 				Output.add_stmt (Output.Mvhi (reg_sw, (ss lsr 16) mod (1 lsl 16)));
@@ -770,7 +741,7 @@ and g' oc = function
 				Output.add_stmt (Output.Sub (reg_sp, reg_sp, reg_sw));
 	% endif
 				Output.add_stmt (Output.Call x);
-	% if isUse("ADDI"):
+	% if config.isUse("ADDI"):
 				Output.add_stmt (Output.Addi (reg_sp, reg_sp, ss)); 
 	% else:
 				Output.add_stmt (Output.Mvhi (reg_sw, (ss lsr 16) mod (1 lsl 16)));
@@ -779,19 +750,19 @@ and g' oc = function
 	% endif
 % else:
 				Output.add_stmt (Output.Sti (reg_lk, reg_sp, ss));
-	% if isUse("SUBI"):
-				Output.add_stmt (Output.Subi (reg_sp, reg_sp, ss + ${addressingUnit}));
+	% if config.isUse("SUBI"):
+				Output.add_stmt (Output.Subi (reg_sp, reg_sp, ss + ${config.addressingUnit}));
 	% else:
-				Output.add_stmt (Output.Mvhi (reg_sw, ((ss + ${addressingUnit}) lsr 16) mod (1 lsl 16)));
-				Output.add_stmt (Output.Mvlo (reg_sw, (ss + ${addressingUnit}) mod (1 lsl 16)));
+				Output.add_stmt (Output.Mvhi (reg_sw, ((ss + ${config.addressingUnit}) lsr 16) mod (1 lsl 16)));
+				Output.add_stmt (Output.Mvlo (reg_sw, (ss + ${config.addressingUnit}) mod (1 lsl 16)));
 				Output.add_stmt (Output.Sub (reg_sp, reg_sp, reg_sw));
 	% endif
 				Output.add_stmt (Output.Jal x);
-	% if isUse("ADDI"):
-				Output.add_stmt (Output.Addi (reg_sp, reg_sp, ss + ${addressingUnit})); 
+	% if config.isUse("ADDI"):
+				Output.add_stmt (Output.Addi (reg_sp, reg_sp, ss + ${config.addressingUnit})); 
 	% else:
-				Output.add_stmt (Output.Mvhi (reg_sw, ((ss + ${addressingUnit}) lsr 16) mod (1 lsl 16)));
-				Output.add_stmt (Output.Mvlo (reg_sw, (ss + ${addressingUnit}) mod (1 lsl 16)));
+				Output.add_stmt (Output.Mvhi (reg_sw, ((ss + ${config.addressingUnit}) lsr 16) mod (1 lsl 16)));
+				Output.add_stmt (Output.Mvlo (reg_sw, (ss + ${config.addressingUnit}) mod (1 lsl 16)));
 				Output.add_stmt (Output.Add (reg_sp, reg_sp, reg_sw));
 	% endif
 				Output.add_stmt (Output.Ldi (reg_lk, reg_sp, ss));
@@ -861,13 +832,13 @@ let print_list ls =
 	"[" ^ (print_list ls) ^ "]"
 
 let h oc { name = Id.L(x); args = args; fargs = fargs; body = e; ret = ret } =
-	Output.add_stmt (Output.Comment (Printf.sprintf "\n${comment}---------------------------------------------------------------------"));
-	Output.add_stmt (Output.Comment (Printf.sprintf "${comment} args = %s" (print_list args)));
-	Output.add_stmt (Output.Comment (Printf.sprintf "${comment} fargs = %s" (print_list fargs)));
+	Output.add_stmt (Output.Comment (Printf.sprintf "\n${config.comment}---------------------------------------------------------------------"));
+	Output.add_stmt (Output.Comment (Printf.sprintf "${config.comment} args = %s" (print_list args)));
+	Output.add_stmt (Output.Comment (Printf.sprintf "${config.comment} fargs = %s" (print_list fargs)));
 	(* TODO: 文字数が多くなるとアセンブリで読み込めなくなる *)
-(*	Output.add_stmt (Output.Comment (Printf.sprintf "${comment} use_regs = %s" (print_list (S.fold (fun x env -> x :: env) (Asm.get_use_regs x) []))));
-*)	Output.add_stmt (Output.Comment (Printf.sprintf "${comment} ret type = %s" (Type.string_of_type ret)));
-	Output.add_stmt (Output.Comment (Printf.sprintf "${comment}---------------------------------------------------------------------"));
+(*	Output.add_stmt (Output.Comment (Printf.sprintf "${config.comment} use_regs = %s" (print_list (S.fold (fun x env -> x :: env) (Asm.get_use_regs x) []))));
+*)	Output.add_stmt (Output.Comment (Printf.sprintf "${config.comment} ret type = %s" (Type.string_of_type ret)));
+	Output.add_stmt (Output.Comment (Printf.sprintf "${config.comment}---------------------------------------------------------------------"));
 	Output.add_stmt (Output.Label x);
 	(*  Printf.printf "%s\n" x; flush stdout;*)
 	stackmap := M.empty;
@@ -884,9 +855,9 @@ let f oc (Prog(fundefs, e)) =
 	stackmap := M.empty;
 
 	(* reg_hp, reg_p1, reg_m1の初期化 *)
-	(* + ${addressingUnit}してるのはヒープレジスタの退避用 *)
-	let pos = !GlobalEnv.offset + ${addressingUnit} in
-% if isUse("ADDI"):
+	(* + ${config.addressingUnit}してるのはヒープレジスタの退避用 *)
+	let pos = !GlobalEnv.offset + ${config.addressingUnit} in
+% if config.isUse("ADDI"):
 	Output.add_stmt (Output.Mvhi (reg_hp, (pos lsr 16) mod (1 lsl 16)));
 	Output.add_stmt (Output.Mvlo (reg_hp, pos mod (1 lsl 16)));
 	Output.add_stmt (Output.Addi (reg_p1, reg_0, 1));
@@ -903,7 +874,7 @@ let f oc (Prog(fundefs, e)) =
 
 	List.iter (fun fundef -> h oc fundef) fundefs;
 
-% if isUse("ADDI") and isUse("SUBI"):
+% if config.isUse("ADDI") and config.isUse("SUBI"):
 	Output.optimize ();
 % endif
 	Output.output oc;

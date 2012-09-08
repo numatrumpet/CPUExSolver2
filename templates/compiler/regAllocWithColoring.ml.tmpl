@@ -1,8 +1,4 @@
-<%
-	r = xmlroot.find(".//intRegs").get("prefix") % ()
-	f = xmlroot.find(".//floatRegs").get("prefix") % ()
-	zeroReg = r + xmlroot.find(".//zeroReg").get("index")
-%>(* TODO *)
+(* TODO *)
 open Asm
 
 let fixed = ref S.empty
@@ -162,7 +158,7 @@ let h { name = Id.L(x); args = ys; fargs = zs; body = e; ret = t } = (* 関数�
 	let (e', _) = g (data.ret_reg, t) cont regenv e in
 	
 	(* use_regsを正しい値にする。（この時点では allregs @ allfregs がuse_regsに入っている） *)
-	(* 正しい値とは、e'の中で使用されるレジスタ＋引数＋返り値（${r}3または${f}0） *)
+	(* 正しい値とは、e'の中で使用されるレジスタ＋引数＋返り値（${config.r}3または${config.f}0） *)
 	fundata := M.add x data !fundata;
 	let env = S.union (S.of_list data.arg_regs) (S.add data.ret_reg (get_use_regs x e')) in
 	let env = S.filter is_reg env in

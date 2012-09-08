@@ -895,7 +895,7 @@ bool MainWindow::WriteXML(QString filepath)
             << "\t<RAM size=\"" << generalModel->item(RAM_SIZE)->text() << "\" />\n"
             << "\t<comment text=\"" << generalModel->item(COMMENTOUT)->text() << "\" />\n"
             << "\n"
-            << "\t<binary endian=\"" << endian << "\" constTableType=\"no_use\" tag=\"0xffFFffFF\" addressing=\"" << ram_addressing << "\" rom_addressing=\"" << rom_addressing << "\" direction=\"toBig\"/>\n"
+            << "\t<binary endian=\"" << endian << "\" const-table-type=\"no_use\" tag=\"0xffFFffFF\" addressing=\"" << ram_addressing << "\" rom-addressing=\"" << rom_addressing << "\" direction=\"toBig\"/>\n"
             << "\t<instructions forward=\"true\">\n"
             << "\t\t<CONST>\n"
             << consts

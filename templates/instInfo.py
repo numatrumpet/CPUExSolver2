@@ -2,8 +2,8 @@
 
 def constructInstInfo(config):
 
-  addrUnit = 4 if config.isByteAdressing else 1
-  rom_addrUnit = 4 if config.romIsByteAdressing == "byte" else 1
+  addrUnit = 4 if config.isByteAddressing else 1
+  rom_addrUnit = 4 if config.romIsByteAddressing else 1
   addrDiv = " / 4" if addrUnit == 4 else ""
 
   direction =  config.direction
@@ -14,10 +14,10 @@ def constructInstInfo(config):
     return config.getInst(type).get("addressMode")
   
   def getBranchCode(cond, type):
-    return "if (" + cond + ") pc " + ("+= IMM + (%d)" % (-rom_addrUnit + config.relativeAddressOffset) if getAddrMode('BEQ') == 'relative' else "= IMM")
+    return "if (" + cond + ") pc " + ("+= IMM + (%d)" % (-rom_addrUnit + int(config.relativeAddressOffset)) if getAddrMode('BEQ') == 'relative' else "= IMM")
   
   # RS, RT, RDはformAsmの設定によって互いに役目を入れか得られる。
-  instInfo = [
+  return [
     {'type' : 'MOV', 'formBin' : 'R', 'formAsm' : ['IRT', 'IRS'], 'code' : ["%(arg0)s = %(arg1)s"]},
     {'type' : 'ADD', 'formBin' : 'R', 'formAsm' : ['IRD', 'IRS', 'IRT'], 'code' : ["%(arg0)s = %(arg1)s + %(arg2)s"]},
     {'type' : 'SUB', 'formBin' : 'R', 'formAsm' : ['IRD', 'IRS', 'IRT'], 'code' : ["%(arg0)s = %(arg1)s - %(arg2)s"]},

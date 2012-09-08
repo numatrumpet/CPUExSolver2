@@ -1,32 +1,11 @@
 <%
-	def getInst(type):
-		inst = xmlroot.find(".//" + type)
-		assert not(inst is None), (type + " was not found")
-		return inst
-	
-	def getName(type):
-		inst = getInst(type)
-		name = inst.get("name")
-		assert not(name is None), (type + "'s name was not found")
-		return name	
-	
-	def isUse(type):
-		return "false" != getInst(type).get("use", "true")
 
 	def getAddrMode(type):
-		return getInst(type).get("addressMode", "absolute")
+		config.getInst(type).get("addressMode", "absolute")
 
-	binary = xmlroot.find(".//binary")
-	addressing = binary.get("addressing").strip()
-	rom_addressing = binary.get("rom_addressing").strip()
-	endian = binary.get("endian").strip()
-	constTableType = binary.get("constTableType").strip()
-	tag = binary.get("tag", "0xffFFffFF").strip()
-	comment = xmlroot.find("comment").get("text").strip()
-	relativeAddressOffset = int(binary.get("relativeAddressOffset", "0"))
+	instsI = filter(lambda inst: inst["formBin"] == 'I' and config.isUse(inst["type"]), instInfo)
+	instsJ = filter(lambda inst: inst["formBin"] == 'J' and config.isUse(inst["type"]), instInfo)
 
-	instsI = filter(lambda inst: inst["formBin"] == 'I' and isUse(inst["type"]), instInfo)
-	instsJ = filter(lambda inst: inst["formBin"] == 'J' and isUse(inst["type"]), instInfo)
 	relativeInstsI = filter(lambda inst: getAddrMode(inst["type"]) == "relative", instsI)
 	absoluteInstsI = filter(lambda inst: getAddrMode(inst["type"]) != "relative", instsI)
 	relativeInstsJ = filter(lambda inst: getAddrMode(inst["type"]) == "relative", instsJ)
@@ -91,11 +70,11 @@ uint32_t getAddr(string label, uint32_t base = 0)
 	
 //	cerr << "addr of " << label << " is " << addr << endl; 
 
-	return  ${"(addr - base) * 4" if rom_addressing == "byte" else "addr - base"};
+	return  ${"(addr - base) * 4" if config.isByteAddressing else "addr - base"};
 }
 
 ## 定数テーブルを使うとき
-% if constTableType != "no_use":
+% if config.constTableType != "no_use":
 //-----------------------------------------------------------------------------
 //
 // 初期化時にヒープに格納する定数テーブルの内容を読み込む
@@ -120,8 +99,8 @@ bool readHeapData()
 			if (cnt >= 1)
 			{
 ## 定数テーブルのサイズを1バイト目に書き込む。単位（バイトかワードか）を間違えないこと！
-% if constTableType == "writeSize":
-				push(binaries, heapSize / ${8 if addressing == "byte" else 32});
+% if config.constTableType == "writeSize":
+				push(binaries, heapSize / ${8 if config.isByteAddressing else 32});
 % endif
 				break;
 			}
@@ -162,8 +141,8 @@ bool readHeapData()
 	}
 
 ## 定数テーブルの内容が終わったことを知らせるバイト列を記入(エンディアンはそのまま)
-% if constTableType == "toTag":
-				push(binaries, ${tag});
+% if config.constTableType == "toTag":
+				push(binaries, ${config.tag});
 
 % endif
 	return error == false;
@@ -194,7 +173,7 @@ bool readInstructions()
 				}
 				labels[str] = binaries.size();
 			}
-			else if (string(instName).find("${comment}") == 0)
+			else if (string(instName).find("${config.comment}") == 0)
 			{
 				// コメント
 			}
@@ -237,11 +216,11 @@ bool readInstructions()
 //-----------------------------------------------------------------------------
 void resolveLabels()
 {
-% if constTableType != "no_use":
+% if config.constTableType != "no_use":
 	// binaries中での命令コマンドの開始位置
 	int instOffset = heapSize / 32 + 1;
 % endif
-	for (int i = ${"instOffset" if constTableType != "no_use" else "0"}; i < binaries.size(); i++)
+	for (int i = ${"instOffset" if config.constTableType != "no_use" else "0"}; i < binaries.size(); i++)
 	{
 		// ラベルを使わない命令なら飛ばす
 		if (binaries[i].second == false)
@@ -257,7 +236,7 @@ void resolveLabels()
 			// I形式
 % if len(relativeInstsI) >= 1:
 	% for inst in relativeInstsI:
-			case ${getName(inst["type"]).upper()}:
+			case ${config.getName(inst["type"]).upper()}:
 	% endfor
 				if (labelNames.count(i) <= 0)
 				{
@@ -265,12 +244,12 @@ void resolveLabels()
 					exit(-1);
 				} 
 				name = labelNames[i];
-				binaries[i].first = (binaries[i].first & 0xffFF0000) | (getAddr(name, i + ${relativeAddressOffset}) & 0xffFF);
+				binaries[i].first = (binaries[i].first & 0xffFF0000) | (getAddr(name, i + ${config.relativeAddressOffset}) & 0xffFF);
 				break;
 % endif
 % if len(absoluteInstsI) >= 1:
 	% for inst in absoluteInstsI:
-			case ${getName(inst["type"]).upper()}:
+			case ${config.getName(inst["type"]).upper()}:
 	% endfor
 				if (labelNames.count(i) <= 0)
 				{
@@ -283,7 +262,7 @@ void resolveLabels()
 % endif
 % if len(relativeInstsJ) >= 1:
 	% for inst in relativeInstsJ:
-			case ${getName(inst["type"]).upper()}:
+			case ${config.getName(inst["type"]).upper()}:
 	% endfor
 				// 絶対アドレス
 				if (labelNames.count(i) <= 0)
@@ -297,7 +276,7 @@ void resolveLabels()
 % endif
 % if len(absoluteInstsJ) >= 1:
 	% for inst in absoluteInstsJ:
-			case ${getName(inst["type"]).upper()}:
+			case ${config.getName(inst["type"]).upper()}:
 	% endfor
 				// 絶対アドレス
 				if (labelNames.count(i) <= 0)
@@ -324,7 +303,7 @@ void output()
 {
 	rep(i, binaries.size())
 	{
-		binaries[i].first = endian(binaries[i].first, ${"true" if endian == "BIG" else "false"});
+		binaries[i].first = endian(binaries[i].first, ${"true" if config.endian == "BIG" else "false"});
 		fwrite(&binaries[i].first, sizeof(uint32_t), 1, dstFile);
 	}
 }
@@ -348,7 +327,7 @@ bool assemble(const char* srcPath, const char* dstPath)
 
 	bool result = false;
 
-% if constTableType != "no_use":
+% if config.constTableType != "no_use":
 	// ヒープの初期化部分の読み込み
 	result = readHeapData();
 	if (result == false)

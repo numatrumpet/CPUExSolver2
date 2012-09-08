@@ -1,10 +1,4 @@
-<%
-	r = xmlroot.find(".//intRegs").get("prefix") % ()
-	f = xmlroot.find(".//floatRegs").get("prefix") % ()
-	zeroReg = r + xmlroot.find(".//zeroReg").get("index")
-	addressing = xmlroot.find(".//binary").get("addressing")
-	addressingUnit = 4 if addressing == "byte" else 1
-%>(* translation into SPARC assembly with infinite number of virtual registers *)
+(* translation into SPARC assembly with infinite number of virtual registers *)
 
 open Asm
 
@@ -14,8 +8,8 @@ let global_offset = ref M.empty
 
 let set_global_offset x =
 	global_offset := M.add x !global_cnt !global_offset;
-	global_cnt := ${addressingUnit} + !global_cnt;
-	!global_cnt - ${addressingUnit}
+	global_cnt := ${config.addressingUnit} + !global_cnt;
+	!global_cnt - ${config.addressingUnit}
 	
 let get_global_offset x = try M.find x !global_offset with Not_found -> Printf.eprintf "Not found in Virtual.get_global_offset : %s\n" x; assert false
 
@@ -44,9 +38,9 @@ let expand xts ini addf addi =
     ini
     (fun (offset, acc) x ->
       let offset = align offset in
-      (offset + ${addressingUnit}, addf x offset acc))
+      (offset + ${config.addressingUnit}, addf x offset acc))
     (fun (offset, acc) x t ->
-      (offset + ${addressingUnit}, addi x t offset acc))
+      (offset + ${config.addressingUnit}, addi x t offset acc))
 
 let rec g env =
   function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
@@ -113,8 +107,8 @@ let rec g env =
 			concat (
 				concat (
 					concat (
-						(* 	let reg_hp = st reg_hp reg_bottom !GlobalEnv.offset + ${addressingUnit} in *)
-						(Ans (St (reg_hp, reg_0, C (-${addressingUnit} - !GlobalEnv.offset))))
+						(* 	let reg_hp = st reg_hp reg_bottom !GlobalEnv.offset + ${config.addressingUnit} in *)
+						(Ans (St (reg_hp, reg_0, C (-${config.addressingUnit} - !GlobalEnv.offset))))
 					)
 			      	(Id.gentmp Type.Unit, Type.Unit)
 					(*	let reg_hp = reg_bottom - !GlobalEnv.offsets[x] in *)
@@ -125,8 +119,8 @@ let rec g env =
 				e1'
 			)
 			(x, Type.Int)
-			(* 	let reg_hp = reg_bottom - !GlobalEnv.offset + ${addressingUnit}  in *)
-			(Ans (Ld (reg_0, C (-${addressingUnit} - !GlobalEnv.offset))))
+			(* 	let reg_hp = reg_bottom - !GlobalEnv.offset + ${config.addressingUnit}  in *)
+			(Ans (Ld (reg_0, C (-${config.addressingUnit} - !GlobalEnv.offset))))
 		)
 		(reg_hp, Type.Int)
 		(* e2' *)
@@ -162,7 +156,7 @@ let rec g env =
       let offset, store_fv =
 		expand
 		  (List.map (fun y -> (y, M.find y env)) ys)
-		  (${addressingUnit}, e2')
+		  (${config.addressingUnit}, e2')
 		  (fun y offset store_fv -> seq(StF(y, x, C(-offset)), store_fv))
 		  (fun y _ offset store_fv -> seq(St(y, x, C(-offset)), store_fv)) in
       Let((x, t), Mov(reg_hp),
@@ -274,7 +268,7 @@ let h { Closure.name = (Id.L x, t); Closure.args = yts; Closure.formal_fv = zts;
 	let (int, float) = separate yts in
 	let (offset, load) = expand
 							zts
-							(${addressingUnit}, g (M.add x t (M.add_list yts (M.add_list zts (*M.empty*)!GlobalEnv.env))) e)
+							(${config.addressingUnit}, g (M.add x t (M.add_list yts (M.add_list zts (*M.empty*)!GlobalEnv.env))) e)
 							(fun z offset load -> fletd(z, LdF(reg_cl, C(-offset)), load))
 							(fun z t offset load -> Let((z, t), Ld(reg_cl, C(-offset)), load)) in
 	let (offset, load) = expand

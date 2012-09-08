@@ -1,13 +1,4 @@
-<%
-	def getInst(type):
-		inst = xmlroot.find(".//" + type)
-		assert inst is not None, "inst is None(" + type + ")"
-		return inst
-	
-	def isUse(type):
-		use = getInst(type).get("use", "true")
-		return use != "false"
-%>(* 浮動小数基本演算1 *)
+(* 浮動小数基本演算1 *)
 let rec fequal a b = a = b in
 let rec fless a b = (a < b) in
 
@@ -35,7 +26,7 @@ let pi = 3.14159265358979323846264 in
 let pi2 = pi *. 2.0 in
 let pih = pi *. 0.5 in
 
-% if not isUse("FATAN"):
+% if not config.isUse("FATAN"):
 (* atan *)
 let rec atan_sub i xx y =
 	if i < 0.5 then y
@@ -59,7 +50,7 @@ let rec atan x =
 	in
 
 % endif
-% if not isUse("FTAN") or not isUse("FSIN") or not isUse("FCOS"):
+% if not config.isUse("FTAN") or not config.isUse("FSIN") or not config.isUse("FCOS"):
 (* tan *)
 let rec tan x = (* -pi/4 <= x <= pi/4 *)
 	let rec tan_sub i xx y =
@@ -70,7 +61,7 @@ let rec tan x = (* -pi/4 <= x <= pi/4 *)
 in
 
 % endif
-% if not isUse("FSIN") or not isUse("FCOS"):
+% if not config.isUse("FSIN") or not config.isUse("FCOS"):
 (* sin *)
 let rec sin_sub x = 
 	let pi2 = pi *. 2.0 in
@@ -93,7 +84,7 @@ let rec sin x =
 	if s2 then ans else fneg ans in
 
 % endif
-% if not isUse("FCOS"):
+% if not config.isUse("FCOS"):
 (* cos *)
 let rec cos x = 
 	let pih = pi *. 0.5 in

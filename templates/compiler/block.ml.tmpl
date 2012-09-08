@@ -1,8 +1,4 @@
-<%
-	r = xmlroot.find(".//intRegs").get("prefix") % ()
-	f = xmlroot.find(".//floatRegs").get("prefix") % ()
-	zeroReg = r + xmlroot.find(".//zeroReg").get("index")
-%>open Asm
+open Asm
 
 let debug = false 
 
@@ -507,7 +503,7 @@ let make_fundef {Asm.name = Id.L x; Asm.args = ys; Asm.fargs = zs; Asm.body = e;
 		fDef_regs = []
 	} in
 	let ret_reg =
-		try (M.find x !fundata).ret_reg with Not_found -> "${zeroReg}" in
+		try (M.find x !fundata).ret_reg with Not_found -> "${config.zeroReg}" in
 	g f blk (ret_reg, t) e;
 	f
 

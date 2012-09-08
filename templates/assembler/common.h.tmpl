@@ -1,30 +1,4 @@
-<%
-	romSize = xmlroot.find(".//RAM").get("size")
-	intRegNum = xmlroot.find(".//intRegs").get("num")
-	floatRegNum = xmlroot.find(".//floatRegs").get("num")
-
-	def getInst(type):
-		inst = xmlroot.find(".//" + type)
-		assert inst is not None, "inst is None(" + type + ")"
-		return inst
-	
-	def getName(type):
-		name = getInst(type).get("name")
-		name is not None, "name is None(" + type + ")"
-		return name
-	
-	def getOp(type):
-		op = getInst(type).get("op")
-		op is not None, "op is None(" + type + ")"
-		return op
-			
-	def getFunct(type):
-		return getInst(type).get("funct")
-
-	def isUse(type):
-		use = getInst(type).get("use", "true")
-		return use != "false"
-%>#ifndef _COMMON_H
+#ifndef _COMMON_H
 #define _COMMON_H
 
 #include <iostream>
@@ -41,23 +15,26 @@
 #define eq(a, b) (strcmp(a, b) == 0)
 
 #define ROM_NUM (64 * 1024) // 64KByte
-#define RAM_NUM (${romSize})
+#define RAM_NUM (${config.romSize})
 
 #define MAX_INSTS 64 // 6bit
 
-#define INTREG_NUM (${intRegNum})
-#define FLOATREG_NUM (${floatRegNum})
+#define INTREG_NUM (${config.intRegsNum})
+#define FLOATREG_NUM (${config.floatRegsNum})
 
-% for constNum in xmlroot.find(".//CONST"):
+% if config.constOps is not None:
+% for constNum in config.constOps:
 #define ${constNum.tag} (${constNum.get("value")})
 % endfor
+% endif
+
 % for inst in instInfo:
-	% if isUse(inst["type"]):
-		% if not getOp(inst["type"]).isalpha():
-#define ${getName(inst["type"]).upper()} (${getOp(inst["type"])})
+	% if config.isUse(inst["type"]):
+		% if not config.getOp(inst["type"]).isalpha():
+#define ${config.getName(inst["type"]).upper()} (${config.getOp(inst["type"])})
 		% endif
-		% if (getFunct(inst["type"]) is not None) and (not getFunct(inst["type"]).isalpha()):
-#define ${getName(inst["type"]).upper()}_F (${getFunct(inst["type"])})
+		% if (config.getFunct(inst["type"]) is not None) and (not config.getFunct(inst["type"]).isalpha()):
+#define ${config.getName(inst["type"]).upper()}_F (${config.getFunct(inst["type"])})
 		% endif
 	% endif
 % endfor

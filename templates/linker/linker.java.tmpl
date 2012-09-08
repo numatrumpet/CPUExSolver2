@@ -1,6 +1,6 @@
 <%
 	# ラベルジャンプの命令名
-	jmp = xmlroot.find(".//BRANCH").get("name")
+	jmp = config.getName("BRANCH")
 %>import java.util.regex.*;
 import java.io.*;
 
@@ -30,7 +30,7 @@ class linker
 			// 出力ファイルを開く
 			FileOutputStream dstStream = new FileOutputStream(args[cnt - 1]);
 			OutputStreamWriter dst = new OutputStreamWriter(dstStream, "UTF-8");
-% if xmlroot.find(".//binary").get("constTableType") != "no_use":
+% if config.constTableType != "no_use":
 
 			// 各ソースファイルのヒープサイズを読み込む
 			int heapSum = 0;
