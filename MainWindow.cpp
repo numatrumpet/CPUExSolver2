@@ -594,10 +594,10 @@ void MainWindow::InitInstTVs()
     ioExpalains
         <<"1byte読み込み"
         <<"1word読み込み"
-        <<"1byte浮動小数レジスタに読み込み"
+        <<"1word浮動小数レジスタに読み込み"
         <<"1byte書き出し"
         <<"1word書き出し"
-        <<"1byte浮動小数レジスタから書き出し"
+        <<"1word浮動小数レジスタから書き出し"
         <<"プログラムを終了";
     cnt = 0;
     AddRow(tableModel, cnt++, "inputb", false, "rs", "System", "0","rs <- ReadByte()", "R");
