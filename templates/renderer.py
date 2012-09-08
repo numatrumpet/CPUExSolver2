@@ -118,6 +118,30 @@ instInfo = [
 	{'type' : 'HALT', 'formBin' : 'R', 'formAsm' : [], 'code' : []}
 ]
 
+def getInst(type):
+	inst = xmlroot.find(".//" + type)
+	assert inst is not None, "inst is None(" + type + ")"
+	return inst
+
+def getName(type):
+	name = getInst(type).get("name")
+	name is not None, "name is None(" + type + ")"
+	return name
+
+def isUse(type):
+	use = getInst(type).get("use", "true")
+	return use != "false"
+
+def assertAvailable(type):
+	assert isUse(type), "[emit] %s must be supported." % (getName(type))
+
+# GUI が要求している命令が使えることを確認
+for inst in ['ADD', 'SUB', 'SETLO', 'SETHI', 'SLLI', 'SRAI', 'FMOV', 'FNEG',
+						 'FADD', 'FSUB', 'FMUL', 'FDIV', 'FSQRT', 'LDI', 'STI', 'FLDI',
+						 'FSTI', 'BEQ', 'BLT', 'FBEQ', 'FBLT', 'BRANCH', 'JMPREG',
+						 'INPUTBYTE', 'OUTPUTBYTE', 'HALT']:
+	assertAvailable(inst)
+
 t = Template(filename=sys.argv[2], input_encoding="utf-8", output_encoding="utf-8", encoding_errors="replace")
 print t.render(xmlroot=xmlroot, instInfo = instInfo)
 
