@@ -304,7 +304,11 @@ void output()
 	rep(i, binaries.size())
 	{
 		binaries[i].first = endian(binaries[i].first, ${"true" if config.endian == "BIG" else "false"});
-		fwrite(&binaries[i].first, sizeof(uint32_t), 1, dstFile);
+    % if config.binaryFileType == "hex":
+		fprintf(dstFile, "%08x\n", (uint32_t)binaries[i].first);
+    % else:
+    fwrite(&binaries[i].first, sizeof(uint32_t), 1, dstFile);
+    % endif
 	}
 }
 

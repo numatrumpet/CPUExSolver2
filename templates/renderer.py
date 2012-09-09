@@ -25,6 +25,8 @@ class Config:
     self.floatRegsPrefix = self.xmlroot.find(".//floatRegs").get("prefix")
     # %% を % に変換
     self.f = self.floatRegsPrefix % ()
+
+    self.binaryFileType = self.xmlroot.find(".//binary").get('file-type', 'binary')
     
     self.setRegisters()
     self.setBinaryAttributes()

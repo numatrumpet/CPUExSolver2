@@ -17,7 +17,7 @@
 	<RAM size="8.00" />
 	<comment text="#" />
 
-	<binary endian="LITTLE" const-table-type="no_use" tag="0xffFFffFF" addressing="word" rom-addressing="word" direction="toBig"/>
+	<binary endian="LITTLE" const-table-type="no_use" tag="0xffFFffFF" addressing="word" rom-addressing="word" direction="toBig" file-type="hex"/>
 	<instructions forward="true">
 		<!-- 000 -->
 		<ADD name="add" op="0b000000"/>

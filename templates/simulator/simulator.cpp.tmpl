@@ -289,7 +289,12 @@ int simulate(char* srcPath)
 		cerr << "couldn't open " << srcPath << endl;
 		return 1;
 	}
+  % if config.binaryFileType == "hex":
+  int i = 0;
+	while (fscanf(srcFile, "%x", &ROM[i]) != EOF) { i++; }
+  % else:
 	fread(ROM, 4 * ROM_NUM, 1, srcFile);
+  % endif
 	fclose(srcFile);
 	
 	cerr << srcPath << endl;
