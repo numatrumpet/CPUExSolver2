@@ -47,8 +47,6 @@
 		<FSETHI name="fmvhi" op="0b010011"/>
 
 		<!-- 010 -->
-		<ITOF  name="itof"  op="0b010100"/>
-		<FTOI  name="ftoi"  op="0b010101"/>
 		<IMOVF name="imovf" op="0b010110"/>
 		<FMOVI name="fmovi" op="0b010111"/>
 
@@ -124,6 +122,9 @@
 		<BGE  use="false" name="bge"  op="0b11011" addressMode="relative"/>
 		<BGT  use="false" name="bgt"  op="0b11001" addressMode="relative"/>
 		<BNE  use="false" name="bne"  op="0b10111" addressMode="relative"/>
+		<!-- 神資料にのってないのでソフトウェア実装してもらう -->
+		<ITOF  use="false" name="itof"  op="0b010100"/>
+		<FTOI  use="false" name="ftoi"  op="0b010101"/>
 
 		<mnemonics>
 			<NOP name="nop" formAsm="">
