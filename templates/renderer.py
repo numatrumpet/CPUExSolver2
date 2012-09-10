@@ -20,14 +20,14 @@ class Config:
     self.intRegsPrefix = self.xmlroot.find(".//intRegs").get("prefix")
     # %% を % に変換
     self.r = self.intRegsPrefix % ()
-    
+
     self.floatRegsNum    = self.xmlroot.find(".//floatRegs").get("num")
     self.floatRegsPrefix = self.xmlroot.find(".//floatRegs").get("prefix")
     # %% を % に変換
     self.f = self.floatRegsPrefix % ()
 
     self.binaryFileType = self.xmlroot.find(".//binary").get('file-type', 'binary')
-    
+
     self.setRegisters()
     self.setBinaryAttributes()
 
@@ -45,7 +45,7 @@ class Config:
     op = self.getInst(type).get("op")
     op is not None, "op is None(" + type + ")"
     return op
-  
+
   def getFunct(self, type):
     return self.getInst(type).get("funct")
 
@@ -107,14 +107,15 @@ class Config:
     assert val is not None, 'Binary attribute %s is None' % (attr)
     return val.strip()
 
-config = Config(sys.argv[1])
+if __name__ == '__main__':
+  config = Config(sys.argv[1])
 
-# GUI が要求している命令が使えることを確認
-for inst in ['ADD', 'SUB', 'SETLO', 'SETHI', 'SLLI', 'SRAI', 'FMOV', 'FNEG',
-             'FADD', 'FSUB', 'FMUL', 'FDIV', 'FSQRT', 'LDI', 'STI', 'FLDI',
-             'FSTI', 'BEQ', 'BLT', 'FBEQ', 'FBLT', 'BRANCH', 'JMPREG',
-             'INPUTBYTE', 'OUTPUTBYTE', 'HALT']:
-  config.assertAvailable(inst)
+  # GUI が要求している命令が使えることを確認
+  for inst in ['ADD', 'SUB', 'SETLO', 'SETHI', 'SLLI', 'SRAI', 'FMOV', 'FNEG',
+               'FADD', 'FSUB', 'FMUL', 'FDIV', 'FSQRT', 'LDI', 'STI', 'FLDI',
+               'FSTI', 'BEQ', 'BLT', 'FBEQ', 'FBLT', 'BRANCH', 'JMPREG',
+               'INPUTBYTE', 'OUTPUTBYTE', 'HALT']:
+    config.assertAvailable(inst)
 
-t = Template(filename=sys.argv[2], input_encoding="utf-8", output_encoding="utf-8", encoding_errors="replace")
-print t.render(config=config, instInfo = constructInstInfo(config))
+  t = Template(filename=sys.argv[2], input_encoding="utf-8", output_encoding="utf-8", encoding_errors="replace")
+  print t.render(config=config, instInfo = constructInstInfo(config))
