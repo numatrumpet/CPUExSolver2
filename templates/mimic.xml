@@ -64,11 +64,9 @@
 		<LDI name="ldi" op="0b101000"/>
 		<STI name="sti" op="0b101001"/>
 		<LD name="ldr" op="0b101100"/>
-		<ST name="str" op="0b101101"/>
 		<FLDI name="fldi" op="0b101010"/>
 		<FSTI name="fsti" op="0b101011"/>
 		<FLD name="fldr" op="0b101110"/>
-		<FST name="fstr" op="0b101111"/>
 
 		<!-- 100 -->
 		<BEQ  name="beq"  op="0b100000" addressMode="relative"/>
@@ -125,6 +123,9 @@
 		<!-- 神資料にのってないのでソフトウェア実装してもらう -->
 		<ITOF  use="false" name="itof"  op="0b010100"/>
 		<FTOI  use="false" name="ftoi"  op="0b010101"/>
+		<!-- 3ロードは現在の仕組みで不可能なのでソフトウェア実装 -->
+		<ST  use="false" name="str" op="0b101101"/>
+		<FST use="false" name="fstr" op="0b101111"/>
 
 		<mnemonics>
 			<NOP name="nop" formAsm="">
