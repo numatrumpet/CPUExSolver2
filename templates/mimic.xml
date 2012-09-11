@@ -37,14 +37,14 @@
 		<NORI name="nori" op="0b001101"/>
 		<XORI name="xori" op="0b001110"/>
 
-		<SLLI name="slli" op="0b000111"/>
-		<SRAI name="srai" op="0b001111"/>
-
 		<!-- 010 -->
 		<SETLO name="mvlo" op="0b010000"/>
 		<SETHI name="mvhi" op="0b010001"/>
 		<FSETLO name="fmvlo" op="0b010010"/>
 		<FSETHI name="fmvhi" op="0b010011"/>
+		<!-- sll and sra are in 001 group, but no space. this operation is similar to mvlo/hi -->
+		<SLLI name="slli" op="0b010100"/>
+		<SRAI name="srai" op="0b010101"/>
 
 		<!-- 010 -->
 		<IMOVF name="imovf" op="0b010110"/>
