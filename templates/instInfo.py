@@ -90,9 +90,17 @@ def constructInstInfo(config):
     {'type' : 'JMP_LNK', 'formBin' : 'J', 'formAsm' : ['LABEL'], 'code' : ["LR = pc", "pc = get_address(inst)"]},
     {'type' : 'JMPREG_LNK', 'formBin' : 'R', 'formAsm' : ['IRS'], 'code' : ["LR = pc", "pc = %(arg0)s"]},
     # スタックやリンクレジスタの退避を行う関数呼び出し
-    {'type' : 'CALL', 'formBin' : 'J', 'formAsm' : ['LABEL'], 'code' : ["assert(FR >= 0)", "RAM[FR%s] = LR" % addrDiv, "FR -= %d" % addrUnit, "LR = pc", "pc = get_address(inst)"]},
-    {'type' : 'CALLREG', 'formBin' : 'R', 'formAsm' : ['IRS'], 'code' : ["assert(FR >= 0)", "RAM[FR%s] = LR" % addrDiv, "FR -= %d" % addrUnit, "LR = pc", "pc = %(arg0)s"]},
-    {'type' : 'RETURN', 'formBin' : 'R', 'formAsm' : [], 'code' : ["assert(FR >= 0)", "pc = LR", "FR += %d" % addrUnit, "LR = RAM[FR%s]" % addrDiv]},
+    {'type' : 'CALL', 'formBin' : 'J', 'formAsm' : ['LABEL'], 'code' :
+       ["assert(stack_pointer < CALL_STACK_SIZE-1)",
+        "internal_stack[++stack_pointer] = pc",
+        "pc = get_address(inst)"]},
+    {'type' : 'CALLREG', 'formBin' : 'R', 'formAsm' : ['IRS'], 'code' :
+       ["assert(stack_pointer < CALL_STACK_SIZE-1)",
+        "internal_stack[++stack_pointer] = pc",
+        "pc = IRS"]},
+    {'type' : 'RETURN', 'formBin' : 'R', 'formAsm' : [], 'code' :
+       ["assert(stack_pointer > 0)",
+        "pc = internal_stack[stack_pointer--]"]},
     {'type' : 'ST', 'formBin' : 'R', 'formAsm' : ['IRT', 'IRS', 'IRD'], 'code' : ["assert(%%(arg1)s %s %%(arg2)s >= 0)" % dirR, "RAM[(%%(arg1)s %s %%(arg2)s)%s] = %%(arg0)s" % (dirR, addrDiv)]},
     {'type' : 'LD', 'formBin' : 'R', 'formAsm' : ['IRD', 'IRS', 'IRT'], 'code' : ["assert(%%(arg1)s %s %%(arg2)s >= 0)" % dirR, "%%(arg0)s = RAM[(%%(arg1)s %s %%(arg2)s)%s]" % (dirR, addrDiv)]},
     {'type' : 'FST', 'formBin' : 'R', 'formAsm' : ['FRT', 'IRS', 'IRD'], 'code' : ["assert(%%(arg1)s %s %%(arg2)s >= 0)" % dirR, "RAM[(%%(arg1)s %s %%(arg2)s)%s] = %%(arg0)s" % (dirR, addrDiv)]},

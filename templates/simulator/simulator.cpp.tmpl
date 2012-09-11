@@ -57,6 +57,9 @@ uint32_t freg[INTREG_NUM];
 uint32_t lreg;
 % endif
 
+// いいかげんな call stack
+#define CALL_STACK_SIZE 64
+
 // 即値
 #define IMM get_imm(inst)
 // rs（整数レジスタ）
@@ -281,6 +284,10 @@ int simulate(char* srcPath)
 	// 初期化
 	FR = sizeof(RAM)${" - 4" if addressing == "byte" else " / 4 - 1"};
 	// cerr << "FR = " << FR << endl;
+
+	int internal_stack[CALL_STACK_SIZE];
+	int stack_pointer = 0;
+	memset(internal_stack, 0, CALL_STACK_SIZE*sizeof(int));
 
 	// バイナリを読み込む
 	FILE* srcFile = fopen(srcPath, "rb");
